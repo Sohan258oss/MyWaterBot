@@ -36,56 +36,52 @@ body {
   overflow-y: auto;
   display: flex;
   flex-direction: column; 
-  width: 100%; /* Ensure it spans full width */
+  width: 100%;
 }
+
 .msg {
   display: flex;
   flex-direction: column;
   margin-bottom: 24px;
-  width: 100% !important; /* Forces the container to span the full chat width */
+  width: 100%;
 }
 
-/* ------------------ MESSAGE STYLES ------------------ */
+/* ------------------ MESSAGE ALIGNMENT ------------------ */
+
+/* USER: Pushed to the extreme right */
 .msg.user {
-  align-items: flex-end; /* Aligns the text inside the bubble to the right */
-  text-align: right;
+  align-items: flex-end;
 }
 
 .msg.user .bubble {
-  margin-left: auto; /* Pushes the bubble to the far right */
   background: linear-gradient(135deg, #4facfe, #00f2fe);
   color: white;
   border-bottom-right-radius: 4px;
+  margin-left: 20%; /* Prevents bubble from hitting the left wall */
 }
 
-/* BOT MESSAGE ALIGNMENT */
+/* BOT: Pushed to the extreme left */
 .msg.bot {
-  align-items: flex-start; /* Aligns bubble/chart to the left */
+  align-items: flex-start;
 }
 
+.msg.bot .bubble {
+  background: #ffffff;
+  color: #333;
+  border-bottom-left-radius: 4px;
+  border: 1px solid #e0e6ed;
+  margin-right: 20%; /* Prevents bubble from hitting the right wall */
+}
+
+/* COMMON BUBBLE STYLE */
 .bubble {
-  max-width: 75%; /* Bubble takes up most of the row, but not all */
+  width: fit-content; /* Shrinks the background to fit the text */
   padding: 12px 16px;
   border-radius: 18px;
   line-height: 1.5;
   animation: fadeIn 0.25s ease-in;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   word-wrap: break-word;
-}
-
-/* USER BUBBLE */
-.msg.user .bubble {
-  background: linear-gradient(135deg, #4facfe, #00f2fe);
-  color: white;
-  border-bottom-right-radius: 4px; /* Sharper corner for chat effect */
-}
-
-/* BOT BUBBLE */
-.msg.bot .bubble {
-  background: #ffffff;
-  color: #333;
-  border-bottom-left-radius: 4px; /* Sharper corner for chat effect */
-  border: 1px solid #e0e6ed;
 }
 
 /* LOADING */
@@ -98,7 +94,7 @@ body {
 .chart-card {
   width: 100%;
   max-width: 500px; 
-  margin-top: 12px; /* Gap between text bubble and chart */
+  margin-top: 12px;
   background: white;
   padding: 15px;
   border-radius: 12px;

@@ -18,10 +18,10 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
 
-  // Auto-scroll to bottom whenever a new message or chart arrives
+  // Auto-scroll to bottom whenever messages change
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, loading]);
 
   const sendMessage = async () => {
     if (!input.trim()) return;
@@ -32,7 +32,6 @@ export default function App() {
     setLoading(true);
 
     try {
-      // NOTE: Update this URL to your Render Backend URL before you leave tomorrow!
       const res = await fetch("https://ingres-api.onrender.com/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -52,11 +51,11 @@ export default function App() {
     } catch {
       setMessages((m) => [
         ...m,
-        { type: "bot", text: "❌ Backend not responding." }
+        { type: "bot", text: "❌ Backend not responding. Please check your connection." }
       ]);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const handleKeyDown = (e) => {
@@ -74,7 +73,7 @@ export default function App() {
 
       <div className="chat">
         
-        {/* --- WELCOME BOX SECTION --- */}
+        {/* --- WELCOME BOX --- */}
         {messages.length === 0 && (
           <div className="welcome-container">
             <div className="welcome-box">
@@ -126,9 +125,7 @@ export default function App() {
                       responsive: true,
                       maintainAspectRatio: false,
                       scales: {
-                        y: {
-                          beginAtZero: true
-                        }
+                        y: { beginAtZero: true }
                       }
                     }}
                   />
@@ -138,9 +135,10 @@ export default function App() {
           </div>
         ))}
 
+        {/* --- LOADING INDICATOR --- */}
         {loading && (
           <div className="msg bot">
-            <div className="bubble loading">Analyzing groundwater data…</div>
+            <div className="bubble loading">Analyzing groundwater data...</div>
           </div>
         )}
 
@@ -156,7 +154,7 @@ export default function App() {
           placeholder="Ask me about India's groundwater..."
         />
         <button onClick={sendMessage} disabled={loading}>
-          Send
+          {loading ? "..." : "Send"}
         </button>
       </div>
     </div>
