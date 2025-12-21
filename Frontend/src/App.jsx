@@ -1,115 +1,151 @@
-import { useState, useEffect, useRef } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { useState, useRef, useEffect } from "react";
+import { Bar } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Tooltip,
+  Legend
+} from "chart.js";
+import "./App.css";
 
-function App() {
-  const [input, setInput] = useState("")
-  const [messages, setMessages] = useState([]) // Stores the whole chat
-  const scrollRef = useRef(null)
+ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
-  // Auto-scroll to the bottom when a new message arrives
+export default function App() {
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef(null);
+
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-  const handleSend = async () => {
+  const sendMessage = async () => {
     if (!input.trim()) return;
 
-    const userMsg = { role: 'user', text: input };
-    setMessages(prev => [...prev, userMsg]);
-    const currentInput = input;
+    const userMsg = input;
+    setMessages((m) => [...m, { type: "user", text: userMsg }]);
     setInput("");
+    setLoading(true);
 
     try {
-      const res = await fetch("https://ingres-api.onrender.com/ask", {
+      const res = await fetch("http://127.0.0.1:8000/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: currentInput })
-      })
-      const data = await res.json()
-      
-      const botMsg = { 
-        role: 'bot', 
-        text: data.text, 
-        chart: data.chartData 
-      };
-      setMessages(prev => [...prev, botMsg]);
-    } catch (error) {
-      setMessages(prev => [...prev, { role: 'bot', text: "Connection error!" }]);
+        body: JSON.stringify({ message: userMsg })
+      });
+
+      const data = await res.json();
+
+      setMessages((m) => [
+        ...m,
+        {
+          type: "bot",
+          text: data.text,
+          chartData: data.chartData || []
+        }
+      ]);
+    } catch {
+      setMessages((m) => [
+        ...m,
+        { type: "bot", text: "❌ Backend not responding." }
+      ]);
     }
-  }
+
+    setLoading(false);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#f0f9ff', fontFamily: 'sans-serif' }}>
-      {/* Header */}
-      <div style={{ padding: '15px', backgroundColor: '#0284c7', color: 'white', textAlign: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', borderBottom: '4px solid #0ea5e9' }}>
-        <h2 style={{ margin: 0 }}>💧 INGRES AI Assistant</h2>
+    <div className="app">
+      <header className="header">
+        💧 INGRES AI Groundwater Assistant
+      </header>
+
+      <div className="welcome">
+        <h2>India Groundwater Intelligence</h2>
+        <p>
+          Ask about <b>any state, district, block</b> or
+          <b> compare two districts</b>.
+        </p>
+        <ul>
+          <li>📊 Visual charts</li>
+          <li>🔴🟢 Risk-based colors</li>
+          <li>📈 District comparisons</li>
+        </ul>
       </div>
 
-      {/* Chat Window */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+      <div className="chat">
         {messages.map((m, i) => (
-          <div key={i} style={{ marginBottom: '20px', textAlign: m.role === 'user' ? 'right' : 'left' }}>
-            <div style={{ 
-              display: 'inline-block', 
-              padding: '12px 18px', 
-              borderRadius: '15px', 
-              maxWidth: '70%',
-              backgroundColor: m.role === 'user' ? '#0284c7' : 'white',
-              color: m.role === 'user' ? 'white' : '#1e293b',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-            }}>
-              <div style={{ whiteSpace: 'pre-wrap' }}>{m.text}</div>
-              
-              {/* Show chart inside the bot bubble if it exists */}
-              {m.chart && m.chart.length > 0 && (
-                <div style={{ width: '300px', height: '220px', marginTop: '15px', backgroundColor: '#f8fafc', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={m.chart} margin={{ top: 5, right: 5, left: -30, bottom: 5 }}>
-                      <XAxis dataKey="name" hide />
-                      <YAxis tick={{fontSize: 12}} />
-                      <Tooltip 
-                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}
-                        cursor={{fill: 'rgba(0,0,0,0.05)'}}
-                      />
-                      <Bar dataKey="extraction" radius={[4, 4, 0, 0]}>
-                        {m.chart.map((entry, index) => (
-                          <Cell 
-                            key={`cell-${index}`} 
-                            fill={entry.extraction > 100 ? '#ef4444' : '#22c55e'} 
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                  <p style={{ fontSize: '10px', color: '#64748b', textAlign: 'center', marginTop: '5px' }}>
-                    Red: Over-exploited | Green: Safe/Critical
-                  </p>
+          <div key={i} className={`msg ${m.type}`}>
+            <div className="bubble">{m.text}</div>
+
+            {m.chartData && m.chartData.length > 0 && (
+              <div className="chart-card">
+                <div className="chart-container">
+                  <Bar
+                    data={{
+                      labels: m.chartData.map((d) => d.name),
+                      datasets: [
+                        {
+                          label: "Groundwater Extraction (%)",
+                          data: m.chartData.map((d) => d.extraction),
+                          backgroundColor: m.chartData.map((d) =>
+                            d.extraction <= 70
+                              ? "#2ecc71"
+                              : d.extraction <= 100
+                              ? "#f1c40f"
+                              : "#e74c3c"
+                          ),
+                          borderRadius: 10
+                        }
+                      ]
+                    }}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                          max: 160
+                        }
+                      }
+                    }}
+                  />
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         ))}
-        <div ref={scrollRef} />
+
+        {loading && (
+          <div className="msg bot">
+            <div className="bubble loading">Analyzing groundwater data…</div>
+          </div>
+        )}
+
+        <div ref={bottomRef} />
       </div>
 
-      {/* Input Bar */}
-      <div style={{ padding: '20px', backgroundColor: 'white', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '10px', alignItems: 'center' }}>
-        <input 
-          style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '16px' }}
+      <div className="input-box">
+        <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="e.g. Compare Jaipur and Gurugram..."
+          onKeyDown={handleKeyDown}
+          placeholder="Example: compare jaipur and gurugram"
         />
-        <button 
-          onClick={handleSend} 
-          style={{ padding: '12px 25px', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
-        >
+        <button onClick={sendMessage} disabled={loading}>
           Send
         </button>
       </div>
     </div>
-  )
+  );
 }
-
-export default App
