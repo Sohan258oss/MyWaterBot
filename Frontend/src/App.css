@@ -37,16 +37,20 @@ body {
 
 /* ------------------ MESSAGE STYLES ------------------ */
 .msg {
-  margin-bottom: 14px;
   display: flex;
+  flex-direction: column; /* This forces the chart to go below the bubble */
+  margin-bottom: 20px;
+  max-width: 80%;
 }
 
 .msg.user {
-  justify-content: flex-end;
+  align-self: flex-end;
+  align-items: flex-end;
 }
 
 .msg.bot {
-  justify-content: flex-start;
+  align-self: flex-start;
+  align-items: flex-start;;
 }
 
 .bubble {
@@ -112,11 +116,13 @@ body {
 
 /* ------------------ CHART CARD ------------------ */
 .chart-card {
-  margin-top: 10px;
+  width: 100%;
+  max-width: 500px; /* Adjust based on your preference */
+  margin-top: 10px; /* Space between text bubble and chart */
   background: white;
-  border-radius: 16px;
-  padding: 16px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  padding: 15px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 .chart-container {

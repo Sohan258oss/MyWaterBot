@@ -60,7 +60,7 @@ def explain_extraction(name, value):
         meaning = "groundwater is being extracted much faster than it can recharge"
 
     return (
-        f"**{name}** has an average groundwater extraction of **{value}%**. "
+        f"{name} has an average groundwater extraction of {value}%. "
         f"This places it in a **{status}** category, meaning {meaning}."
     )
 
