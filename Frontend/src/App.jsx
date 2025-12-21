@@ -31,6 +31,7 @@ export default function App() {
     setLoading(true);
 
     try {
+      // Remember to change this URL to your Render Backend URL before your trip!
       const res = await fetch("http://127.0.0.1:8000/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -70,20 +71,30 @@ export default function App() {
         💧 INGRES AI Groundwater Assistant
       </header>
 
-      <div className="welcome">
-        <h2>India Groundwater Intelligence</h2>
-        <p>
-          Ask about <b>any state, district, block</b> or
-          <b> compare two districts</b>.
-        </p>
-        <ul>
-          <li>📊 Visual charts</li>
-          <li>🔴🟢 Risk-based colors</li>
-          <li>📈 District comparisons</li>
-        </ul>
-      </div>
-
+      {/* CHAT AREA */}
       <div className="chat">
+        
+        {/* NEW WELCOME MESSAGE: Only shows if messages array is empty */}
+        {messages.length === 0 && (
+          <div className="welcome-container">
+            <div className="welcome-bubble">
+              <h2>👋 Hello! I am the INGRES AI Chatbot</h2>
+              <p>
+                I am here to help you analyze and understand <b>India's Groundwater Resources</b>. 
+                I can provide data, explain causes of water stress, and generate comparison charts.
+              </p>
+              <div className="suggestions">
+                <p><b>Try asking me:</b></p>
+                <ul>
+                  <li>"Compare usage in Punjab and Bihar"</li>
+                  <li>"Why is Rajasthan over-exploited?"</li>
+                  <li>"Overall situation in India"</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
         {messages.map((m, i) => (
           <div key={i} className={`msg ${m.type}`}>
             <div className="bubble">{m.text}</div>
@@ -96,7 +107,7 @@ export default function App() {
                       labels: m.chartData.map((d) => d.name),
                       datasets: [
                         {
-                          label: "Groundwater Extraction (%)",
+                          label: "Groundwater Extraction (%) / Count",
                           data: m.chartData.map((d) => d.extraction),
                           backgroundColor: m.chartData.map((d) =>
                             d.extraction <= 70
@@ -114,8 +125,7 @@ export default function App() {
                       maintainAspectRatio: false,
                       scales: {
                         y: {
-                          beginAtZero: true,
-                          max: 160
+                          beginAtZero: true
                         }
                       }
                     }}
@@ -135,12 +145,13 @@ export default function App() {
         <div ref={bottomRef} />
       </div>
 
+      {/* INPUT AREA */}
       <div className="input-box">
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Example: compare jaipur and gurugram"
+          placeholder="Ask me about India's groundwater..."
         />
         <button onClick={sendMessage} disabled={loading}>
           Send
