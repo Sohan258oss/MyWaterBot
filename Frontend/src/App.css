@@ -30,10 +30,12 @@ body {
 }
 
 /* ------------------ CHAT AREA ------------------ */
+/* ------------------ CHAT AREA ------------------ */
 .chat {
   flex: 1;
   padding: 16px;
   overflow-y: auto;
+  overflow-x: hidden; /* Prevents unwanted horizontal scrolling from negative margins */
   display: flex;
   flex-direction: column; 
   width: 100%;
@@ -48,40 +50,46 @@ body {
 
 /* ------------------ MESSAGE ALIGNMENT ------------------ */
 
-/* USER: Pushed to the extreme right */
+/* USER: Pushed to the absolute right wall */
 .msg.user {
   align-items: flex-end;
 }
 
 .msg.user .bubble {
+  margin-right: -16px; /* Negates chat padding to touch the right edge */
+  margin-left: 20%; 
   background: linear-gradient(135deg, #4facfe, #00f2fe);
   color: white;
+  border-top-right-radius: 0; /* Sharp corner gives the "attached to edge" feel */
   border-bottom-right-radius: 4px;
-  margin-left: 20%; /* Prevents bubble from hitting the left wall */
+  box-shadow: -2px 4px 10px rgba(0, 0, 0, 0.1);
 }
 
-/* BOT: Pushed to the extreme left */
+/* BOT: Pushed to the absolute left wall */
 .msg.bot {
   align-items: flex-start;
 }
 
 .msg.bot .bubble {
+  margin-left: -16px; /* Negates chat padding to touch the left edge */
+  margin-right: 20%;
   background: #ffffff;
   color: #333;
+  border-top-left-radius: 0;
   border-bottom-left-radius: 4px;
   border: 1px solid #e0e6ed;
-  margin-right: 20%; /* Prevents bubble from hitting the right wall */
+  box-shadow: 2px 4px 10px rgba(0, 0, 0, 0.05);
 }
 
 /* COMMON BUBBLE STYLE */
 .bubble {
-  width: fit-content; /* Shrinks the background to fit the text */
-  padding: 12px 16px;
+  width: fit-content; 
+  max-width: calc(100% + 16px); /* Allows bubble to use the extra space created by negative margin */
+  padding: 12px 20px;
   border-radius: 18px;
   line-height: 1.5;
-  animation: fadeIn 0.25s ease-in;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   word-wrap: break-word;
+  position: relative;
 }
 
 /* LOADING */
