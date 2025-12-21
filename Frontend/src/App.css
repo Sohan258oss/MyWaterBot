@@ -39,16 +39,15 @@ body {
 }
 
 /* ------------------ MESSAGE STYLES ------------------ */
-.msg {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 24px;
-  width: 100%; /* Take full width to allow align-self to work */
+.msg.user {
+  align-items: flex-end; /* Aligns the text inside the bubble to the right */
 }
 
-/* USER MESSAGE ALIGNMENT */
-.msg.user {
-  align-items: flex-end; /* Aligns bubble to the right */
+.msg.user .bubble {
+  margin-left: auto; /* Pushes the bubble to the far right */
+  background: linear-gradient(135deg, #4facfe, #00f2fe);
+  color: white;
+  border-bottom-right-radius: 4px;
 }
 
 /* BOT MESSAGE ALIGNMENT */
