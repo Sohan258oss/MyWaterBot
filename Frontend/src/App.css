@@ -26,6 +26,7 @@ body {
   color: white;
   letter-spacing: 0.5px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  z-index: 10;
 }
 
 /* ------------------ CHAT AREA ------------------ */
@@ -33,47 +34,51 @@ body {
   flex: 1;
   padding: 16px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column; /* Crucial for aligning messages */
 }
 
 /* ------------------ MESSAGE STYLES ------------------ */
 .msg {
   display: flex;
-  flex-direction: column; /* This forces the chart to go below the bubble */
-  margin-bottom: 20px;
-  max-width: 80%;
+  flex-direction: column;
+  margin-bottom: 24px;
+  width: 100%; /* Take full width to allow align-self to work */
 }
 
+/* USER MESSAGE ALIGNMENT */
 .msg.user {
-  align-self: flex-end;
-  align-items: flex-end;
+  align-items: flex-end; /* Aligns bubble to the right */
 }
 
+/* BOT MESSAGE ALIGNMENT */
 .msg.bot {
-  align-self: flex-start;
-  align-items: flex-start;;
+  align-items: flex-start; /* Aligns bubble/chart to the left */
 }
 
 .bubble {
-  max-width: 75%;
+  max-width: 75%; /* Bubble takes up most of the row, but not all */
   padding: 12px 16px;
   border-radius: 18px;
   line-height: 1.5;
   animation: fadeIn 0.25s ease-in;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  word-wrap: break-word;
 }
 
 /* USER BUBBLE */
 .msg.user .bubble {
   background: linear-gradient(135deg, #4facfe, #00f2fe);
   color: white;
-  border-bottom-right-radius: 6px;
+  border-bottom-right-radius: 4px; /* Sharper corner for chat effect */
 }
 
 /* BOT BUBBLE */
 .msg.bot .bubble {
-  background: #f4f6f8;
+  background: #ffffff;
   color: #333;
-  border-bottom-left-radius: 6px;
+  border-bottom-left-radius: 4px; /* Sharper corner for chat effect */
+  border: 1px solid #e0e6ed;
 }
 
 /* LOADING */
@@ -82,58 +87,53 @@ body {
   opacity: 0.85;
 }
 
-/* ------------------ WELCOME SECTION ------------------ */
-.welcome-container {
-  display: flex;
-  justify-content: center;
-  margin-top: 40px;
-}
-
-.welcome-box {
-  max-width: 600px;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(10px);
-  border-radius: 18px;
-  padding: 24px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
-}
-
-.welcome-box h2 {
-  margin-top: 0;
-}
-
-.suggestions-box {
-  margin-top: 14px;
-  background: #f0f5ff;
-  padding: 14px;
-  border-radius: 12px;
-}
-
-.suggestions-box ul {
-  margin: 8px 0 0;
-  padding-left: 20px;
-}
-
 /* ------------------ CHART CARD ------------------ */
 .chart-card {
   width: 100%;
-  max-width: 500px; /* Adjust based on your preference */
-  margin-top: 10px; /* Space between text bubble and chart */
+  max-width: 500px; 
+  margin-top: 12px; /* Gap between text bubble and chart */
   background: white;
   padding: 15px;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  animation: fadeIn 0.4s ease-in;
 }
 
 .chart-container {
-  height: 260px;
+  height: 280px;
+  width: 100%;
+}
+
+/* ------------------ WELCOME SECTION ------------------ */
+.welcome-container {
+  display: flex;
+  justify-content: center;
+  padding: 40px 10px;
+}
+
+.welcome-box {
+  max-width: 600px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.suggestions-box {
+  margin-top: 20px;
+  background: #f0f5ff;
+  padding: 16px;
+  border-radius: 12px;
+  text-align: left;
 }
 
 /* ------------------ INPUT AREA ------------------ */
 .input-box {
   display: flex;
   gap: 10px;
-  padding: 12px;
+  padding: 16px;
   background: white;
   border-top: 1px solid #e5e5e5;
 }
@@ -146,40 +146,36 @@ textarea {
   border: 1px solid #ddd;
   font-size: 0.95rem;
   outline: none;
+  transition: border-color 0.2s;
+  height: 45px;
 }
 
 textarea:focus {
   border-color: #0072ff;
 }
 
-/* SEND BUTTON */
 button {
-  padding: 0 22px;
+  padding: 0 24px;
   border-radius: 14px;
   border: none;
   background: linear-gradient(135deg, #0072ff, #00c6ff);
   color: white;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
+  transition: transform 0.1s, opacity 0.2s;
+}
+
+button:active {
+  transform: scale(0.98);
 }
 
 button:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
-}
-
-button:hover:not(:disabled) {
-  opacity: 0.9;
 }
 
 /* ------------------ ANIMATIONS ------------------ */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
