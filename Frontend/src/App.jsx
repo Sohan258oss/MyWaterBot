@@ -18,6 +18,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
 
+  // Auto-scroll to bottom whenever a new message or chart arrives
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -31,7 +32,7 @@ export default function App() {
     setLoading(true);
 
     try {
-      // Remember to change this URL to your Render Backend URL before your trip!
+      // NOTE: Update this URL to your Render Backend URL before you leave tomorrow!
       const res = await fetch("http://127.0.0.1:8000/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -71,19 +72,19 @@ export default function App() {
         💧 INGRES AI Groundwater Assistant
       </header>
 
-      {/* CHAT AREA */}
       <div className="chat">
         
-        {/* NEW WELCOME MESSAGE: Only shows if messages array is empty */}
+        {/* --- WELCOME BOX SECTION --- */}
         {messages.length === 0 && (
           <div className="welcome-container">
-            <div className="welcome-bubble">
+            <div className="welcome-box">
               <h2>👋 Hello! I am the INGRES AI Chatbot</h2>
               <p>
                 I am here to help you analyze and understand <b>India's Groundwater Resources</b>. 
                 I can provide data, explain causes of water stress, and generate comparison charts.
               </p>
-              <div className="suggestions">
+              
+              <div className="suggestions-box">
                 <p><b>Try asking me:</b></p>
                 <ul>
                   <li>"Compare usage in Punjab and Bihar"</li>
@@ -95,6 +96,7 @@ export default function App() {
           </div>
         )}
 
+        {/* --- CHAT MESSAGES --- */}
         {messages.map((m, i) => (
           <div key={i} className={`msg ${m.type}`}>
             <div className="bubble">{m.text}</div>
@@ -107,7 +109,7 @@ export default function App() {
                       labels: m.chartData.map((d) => d.name),
                       datasets: [
                         {
-                          label: "Groundwater Extraction (%) / Count",
+                          label: "Groundwater Extraction (%)",
                           data: m.chartData.map((d) => d.extraction),
                           backgroundColor: m.chartData.map((d) =>
                             d.extraction <= 70
@@ -145,7 +147,7 @@ export default function App() {
         <div ref={bottomRef} />
       </div>
 
-      {/* INPUT AREA */}
+      {/* --- INPUT AREA --- */}
       <div className="input-box">
         <textarea
           value={input}

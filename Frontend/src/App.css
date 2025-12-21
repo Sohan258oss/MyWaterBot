@@ -117,3 +117,35 @@ button {
 button:disabled {
   background: #aaa;
 }
+.welcome-container {
+  display: flex;
+  justify-content: flex-start;
+  padding: 20px;
+  animation: fadeIn 0.5s ease-in;
+}
+
+.welcome-box {
+  background: white;
+  border: 1px solid #ddd;
+  border-left: 6px solid #3498db;
+  border-radius: 15px;
+  padding: 25px;
+  max-width: 450px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.suggestions-box {
+  margin-top: 15px;
+  background: #f1f8ff;
+  padding: 10px 15px;
+  border-radius: 10px;
+}
+
+.suggestions-box ul {
+  padding-left: 20px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
