@@ -23,10 +23,10 @@ export default function App() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
+  const sendMessage = async (explicitMsg = null) => {
+    const userMsg = typeof explicitMsg === "string" ? explicitMsg : input;
+    if (!userMsg.trim()) return;
 
-    const userMsg = input;
     setMessages((m) => [...m, { type: "user", text: userMsg }]);
     setInput("");
     setLoading(true);
@@ -85,11 +85,21 @@ export default function App() {
               
               <div className="suggestions-box">
                 <p><b>Try asking me:</b></p>
-                <ul>
-                  <li>"Compare usage in Punjab and Bihar"</li>
-                  <li>"Why is Rajasthan over-exploited?"</li>
-                  <li>"Overall situation in India"</li>
-                </ul>
+                <div className="suggestions-list">
+                  {[
+                    "Compare usage in Punjab and Bihar",
+                    "Why is Rajasthan over-exploited?",
+                    "Overall situation in India"
+                  ].map((s, i) => (
+                    <button
+                      key={i}
+                      className="suggestion-btn"
+                      onClick={() => sendMessage(s)}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -104,6 +114,8 @@ export default function App() {
               <div className="chart-card">
                 <div className="chart-container">
                   <Bar
+                    role="img"
+                    aria-label="Groundwater extraction comparison chart"
                     data={{
                       labels: m.chartData.map((d) => d.name),
                       datasets: [
@@ -152,8 +164,13 @@ export default function App() {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Ask me about India's groundwater..."
+          aria-label="Chat message input"
         />
-        <button onClick={sendMessage} disabled={loading}>
+        <button
+          onClick={sendMessage}
+          disabled={loading}
+          aria-label={loading ? "Sending message" : "Send message"}
+        >
           {loading ? "..." : "Send"}
         </button>
       </div>

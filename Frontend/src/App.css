@@ -140,6 +140,38 @@ body {
   text-align: left;
 }
 
+.suggestions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.suggestion-btn {
+  background: white;
+  border: 1px solid #d0dfff;
+  color: #0072ff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  text-align: left;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.suggestion-btn:hover {
+  background: #0072ff;
+  color: white;
+  border-color: #0072ff;
+  transform: translateY(-1px);
+}
+
+.suggestion-btn:active {
+  transform: translateY(0);
+}
+
 /* ------------------ INPUT AREA ------------------ */
 .input-box {
   display: flex;
