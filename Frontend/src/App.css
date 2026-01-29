@@ -99,6 +99,7 @@ body {
   border-radius: 18px;
   line-height: 1.5;
   word-wrap: break-word;
+  white-space: pre-wrap; /* Preserves newlines and spaces */
   position: relative;
 }
 
@@ -106,6 +107,7 @@ body {
 .bubble.loading {
   font-style: italic;
   opacity: 0.85;
+  animation: pulse 1.5s infinite ease-in-out;
 }
 
 /* ------------------ CHART CARD ------------------ */
@@ -231,4 +233,10 @@ button:disabled {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
 }
