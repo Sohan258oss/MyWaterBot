@@ -33,18 +33,18 @@ const KarnatakaMap = ({ onBack }) => {
           className="karnataka-svg"
           style={{ width: "100%", height: "auto", maxHeight: "600px" }}
         >
-          {karnatakaDistrictPaths.map((district) => (
+          {Object.entries(karnatakaDistrictPaths).map(([name, path]) => (
             <path
-              key={district.name}
-              d={district.path}
-              fill={getColor(karnatakaDistrictData[district.name]) || "#eee"}
+              key={name}
+              d={path}
+              fill={getColor(karnatakaDistrictData[name]) || "#eee"}
               stroke="#fff"
               strokeWidth="1"
-              onMouseEnter={() => setHoveredDistrict(district.name)}
+              onMouseEnter={() => setHoveredDistrict(name)}
               onMouseLeave={() => setHoveredDistrict(null)}
               className="district-path"
             >
-              <title>{district.name}</title>
+              <title>{name}</title>
             </path>
           ))}
         </svg>
