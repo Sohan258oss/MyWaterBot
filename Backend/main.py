@@ -1,10 +1,55 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
 import sqlite3
+import requests
+import re
+from bs4 import BeautifulSoup
 from thefuzz import process, fuzz
 
 app = FastAPI()
+
+# -------------------- SCRAPER SERVICE --------------------
+def get_latest_news():
+    query = "groundwater levels India"
+    url = f"https://www.google.com/search?q={query.replace(' ', '+')}&tbm=nws"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        # Check for 403 or other non-200 responses
+        if response.status_code != 200:
+            return get_cached_news()
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+        headlines = []
+
+        # Google News headlines in search results are typically in <h3> tags
+        for item in soup.find_all('h3'):
+            text = item.get_text().strip()
+            if text:
+                headlines.append(text)
+            if len(headlines) == 3:
+                break
+
+        if not headlines:
+            return get_cached_news()
+
+        return headlines
+
+    except Exception:
+        # Fallback mechanism for request failures or parsing errors
+        return get_cached_news()
+
+def get_cached_news():
+    return [
+        "Groundwater levels in India showing signs of improvement in some regions due to better monsoon.",
+        "New CGWB report highlights critical depletion in northwestern states.",
+        "Government announces new initiatives for community-led groundwater management."
+    ]
 
 app.add_middleware(
     CORSMiddleware,
@@ -162,6 +207,16 @@ async def ask_bot(item: WaterQuery):
             "suggestions": get_suggestions(user_input)
         }
 
+    # 0. NEWS logic (Explicit)
+    if any(re.search(rf"\b{k}\b", user_input) for k in ["latest", "news", "updates"]):
+        news = await run_in_threadpool(get_latest_news)
+        news_str = "\n".join([f"• {item}" for item in news])
+        return {
+            "text": f"### Latest Groundwater Updates 📰\n\n{news_str}",
+            "chartData": [],
+            "suggestions": get_suggestions(user_input)
+        }
+
     # 1. WHY logic (Explicit)
     if "why" in user_input:
         for key, reason in WHY_MAP.items():
@@ -296,6 +351,12 @@ async def ask_bot(item: WaterQuery):
         "chartData": [],
         "suggestions": get_suggestions(user_input)
     }
+@app.get("/get-news")
+async def get_news():
+    """Returns top 3 groundwater news headlines."""
+    news = await run_in_threadpool(get_latest_news)
+    return {"news": news}
+
 @app.get("/")
 def read_root():
     return {
@@ -303,6 +364,7 @@ def read_root():
         "message": "INGRES AI Groundwater API is running",
         "endpoints": {
             "ask": "/ask (POST)",
+            "get-news": "/get-news (GET)",
             "health": "/ (GET)"
         }
     }

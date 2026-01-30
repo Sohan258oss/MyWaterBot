@@ -3,3 +3,5 @@ uvicorn
 pandas
 pydantic
 thefuzz[speedup]
+requests
+beautifulsoup4
