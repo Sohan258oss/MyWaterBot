@@ -73,6 +73,15 @@ export default function App() {
     }
   };
 
+  const formatText = (text) => {
+    // Remove Markdown-style formatting: **, ###, etc.
+    return text
+      .replace(/\*\*(.*?)\*\*/g, "$1") // Bold
+      .replace(/###\s*(.*?)(\n|$)/g, "$1$2") // Headers
+      .replace(/\n\n/g, "\n") // Reduce extra spacing
+      .trim();
+  };
+
   return (
     <div className="app">
       <header className="header">
@@ -109,7 +118,7 @@ export default function App() {
                       {[
                         "Compare Punjab and Bihar",
                         "Why is Rajasthan stressed?",
-                        "Groundwater conservation tips"
+                        "Check water quality in Rajasthan"
                       ].map((s, i) => (
                         <button
                           key={i}
@@ -134,7 +143,9 @@ export default function App() {
             {/* --- CHAT MESSAGES --- */}
             {messages.map((m, i) => (
               <div key={i} className={`msg ${m.type}`}>
-                <div className="bubble">{m.text}</div>
+                <div className="bubble">
+                  {m.type === "bot" ? formatText(m.text) : m.text}
+                </div>
 
                 {m.type === "bot" && m.suggestions && m.suggestions.length > 0 && (
                   <div className="bot-suggestions">
@@ -160,24 +171,49 @@ export default function App() {
                           labels: m.chartData.map((d) => d.name),
                           datasets: [
                             {
-                              label: "Groundwater Extraction (%)",
+                              label: "Extraction (%)",
                               data: m.chartData.map((d) => d.extraction),
                               backgroundColor: m.chartData.map((d) =>
                                 d.extraction <= 70
-                                  ? "#2ecc71"
+                                  ? "rgba(46, 204, 113, 0.8)"
                                   : d.extraction <= 100
-                                  ? "#f1c40f"
-                                  : "#e74c3c"
+                                  ? "rgba(241, 196, 15, 0.8)"
+                                  : "rgba(231, 76, 60, 0.8)"
                               ),
-                              borderRadius: 10
+                              borderColor: m.chartData.map((d) =>
+                                d.extraction <= 70 ? "#27ae60" : d.extraction <= 100 ? "#f39c12" : "#c0392b"
+                              ),
+                              borderWidth: 1,
+                              borderRadius: 8,
+                              hoverBackgroundColor: m.chartData.map((d) =>
+                                d.extraction <= 70 ? "#2ecc71" : d.extraction <= 100 ? "#f1c40f" : "#e74c3c"
+                              )
                             }
                           ]
                         }}
                         options={{
                           responsive: true,
                           maintainAspectRatio: false,
+                          plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                              backgroundColor: "rgba(0, 0, 0, 0.8)",
+                              padding: 12,
+                              titleFont: { size: 14 },
+                              bodyFont: { size: 13 },
+                              displayColors: false
+                            }
+                          },
                           scales: {
-                            y: { beginAtZero: true }
+                            y: {
+                              beginAtZero: true,
+                              max: Math.max(...m.chartData.map(d => d.extraction)) > 100 ? undefined : 110,
+                              grid: { color: "rgba(0, 0, 0, 0.05)" },
+                              ticks: { callback: (val) => `${val}%` }
+                            },
+                            x: {
+                              grid: { display: false }
+                            }
                           }
                         }}
                       />

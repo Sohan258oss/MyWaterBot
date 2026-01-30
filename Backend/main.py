@@ -34,6 +34,27 @@ KNOWLEDGE_BASE = {
     "salinity": "Salinity refers to the concentration of dissolved salts in water. High salinity can make groundwater unsuitable for drinking or irrigation.",
 }
 
+# -------------------- CONTAMINANTS --------------------
+CONTAMINANT_DATA = {
+    "rajasthan": ["Fluoride", "Nitrate"],
+    "punjab": ["Nitrate", "Arsenic"],
+    "haryana": ["Fluoride", "Nitrate"],
+    "west bengal": ["Arsenic", "Fluoride"],
+    "bihar": ["Arsenic", "Iron"],
+    "uttar pradesh": ["Fluoride", "Arsenic"],
+    "karnataka": ["Fluoride", "Nitrate"],
+    "tamil nadu": ["Fluoride", "Salinity"],
+    "gujarat": ["Salinity", "Fluoride"],
+    "andhra pradesh": ["Fluoride"],
+    "delhi": ["Nitrate", "Fluoride"],
+    "kolar": ["Fluoride"],
+    "bangalore": ["Nitrate"],
+    "tumkur": ["Fluoride"],
+    "chikkaballapura": ["Fluoride"],
+    "raichur": ["Arsenic"],
+    "gulbarga": ["Fluoride"]
+}
+
 # -------------------- WHY MAP --------------------
 WHY_MAP = {
     "punjab": "High dependence on groundwater for water-intensive crops like paddy and wheat; subsidized electricity leads to over-pumping.",
@@ -226,11 +247,21 @@ async def ask_bot(item: WaterQuery):
     if found_data:
         text_prefix = "the comparison" if len(found_data) > 1 else "your search"
         last_data_cache["data"] = found_data
+
+        # Add contaminant warnings
+        contaminant_warnings = []
+        for d in found_data:
+            name_lower = d["name"].lower()
+            if name_lower in CONTAMINANT_DATA:
+                cons = ", ".join(CONTAMINANT_DATA[name_lower])
+                contaminant_warnings.append(f"⚠️ Note: {d['name']} has reported high levels of {cons}.")
+
         explanations = "\n\n".join([explain_extraction(d["name"], d["extraction"]) for d in found_data])
+        warning_text = "\n\n" + "\n".join(contaminant_warnings) if contaminant_warnings else ""
         intro = "Groundwater extraction measures usage relative to natural recharge.\n\n" if is_usage_query else ""
         
         return {
-            "text": f"{intro}Results for {text_prefix}:\n\n{explanations}\n\nWould you like a chart? (Yes/No)",
+            "text": f"{intro}Results for {text_prefix}:\n\n{explanations}{warning_text}\n\nWould you like a chart? (Yes/No)",
             "chartData": [],
             "suggestions": get_suggestions(user_input, found_data)
         }
