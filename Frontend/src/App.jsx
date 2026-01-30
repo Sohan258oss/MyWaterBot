@@ -103,7 +103,10 @@ export default function App() {
                       {[
                         "Compare usage in Punjab and Bihar",
                         "Why is Rajasthan over-exploited?",
-                        "Overall situation in India"
+                        "Overall situation in India",
+                        "Groundwater conservation tips",
+                        "What is an aquifer?",
+                        "Arsenic in groundwater"
                       ].map((s, i) => (
                         <button
                           key={i}

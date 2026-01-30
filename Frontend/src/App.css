@@ -155,6 +155,38 @@ body {
   position: relative;
 }
 
+.map-controls {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--palette-very-pale-blue);
+  padding: 10px 20px;
+  border-radius: 30px;
+  border: 1px solid var(--palette-sky-blue);
+}
+
+.map-controls label {
+  font-weight: 600;
+  color: var(--palette-deep-blue);
+}
+
+.year-dropdown {
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--palette-medium-blue);
+  background: white;
+  color: var(--palette-deep-blue);
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}
+
+.year-dropdown:focus {
+  border-color: var(--palette-deep-blue);
+  box-shadow: 0 0 0 2px var(--palette-sky-blue);
+}
+
 .map-header {
   width: 100%;
   display: flex;

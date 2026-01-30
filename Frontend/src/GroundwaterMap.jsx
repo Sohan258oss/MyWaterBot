@@ -8,10 +8,13 @@ import { getColor } from "./utils/mapUtils";
 const GroundwaterMap = () => {
   const [selectedState, setSelectedState] = useState(null);
   const [view, setView] = useState("india"); // "india" or "karnataka"
+  const [selectedYear, setSelectedYear] = useState(2022);
+
+  const currentYearData = groundwaterData[selectedYear] || {};
 
   const cityColors = {};
-  Object.keys(groundwaterData).forEach((state) => {
-    cityColors[state] = getColor(groundwaterData[state]);
+  Object.keys(currentYearData).forEach((state) => {
+    cityColors[state] = getColor(currentYearData[state]);
   });
 
   const handleSelect = (state) => {
@@ -27,10 +30,24 @@ const GroundwaterMap = () => {
 
   return (
     <div className="map-container" role="region" aria-label="India Groundwater Depth Map">
+      <div className="map-controls">
+        <label htmlFor="year-select">Select Year: </label>
+        <select
+          id="year-select"
+          value={selectedYear}
+          onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+          className="year-dropdown"
+        >
+          <option value={2021}>2021</option>
+          <option value={2022}>2022</option>
+          <option value={2023}>2023</option>
+        </select>
+      </div>
+
       {selectedState ? (
         <div className="state-details">
           <span className="state-name">{selectedState}</span>
-          <span className="state-value">{groundwaterData[selectedState] || "Data not available"} mbgl</span>
+          <span className="state-value">{currentYearData[selectedState] || "Data not available"} mbgl</span>
         </div>
       ) : (
         <div className="state-details placeholder">
