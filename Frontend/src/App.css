@@ -142,7 +142,7 @@ body {
   overflow-y: auto;
 }
 
-.map-container {
+.map-container, .state-map-container {
   background: white;
   padding: 24px;
   border-radius: 18px;
@@ -153,6 +153,43 @@ body {
   width: 100%;
   max-width: 800px;
   position: relative;
+}
+
+.map-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.map-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--palette-deep-blue);
+}
+
+.back-btn {
+  background: var(--palette-very-pale-blue);
+  color: var(--palette-deep-blue);
+  border: 1px solid var(--palette-medium-blue);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.back-btn:hover {
+  background: var(--palette-medium-blue);
+  color: white;
+}
+
+.karnataka-svg {
+  width: 100%;
+  height: auto;
+  max-height: 500px;
 }
 
 .state-details {
