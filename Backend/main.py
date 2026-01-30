@@ -27,7 +27,13 @@ KNOWLEDGE_BASE = {
     "over-exploited": "An over-exploited region extracts more groundwater than it naturally recharges.",
     "safe": "A 'Safe' category means groundwater extraction is below 70% of available recharge.",
     "critical": "A 'Critical' category indicates extraction is between 90% and 100% of recharge capacity.",
-    "stage": "Stage of Extraction is the ratio of groundwater used to groundwater available."
+    "stage": "Stage of Extraction is the ratio of groundwater used to groundwater available.",
+    "aquifer": "An aquifer is an underground layer of water-bearing permeable rock, rock fractures, or unconsolidated materials (gravel, sand, or silt).",
+    "borewell": "A borewell is a deep, narrow hole drilled into the ground to access groundwater from aquifers.",
+    "watershed": "A watershed is an area of land where all the water that falls in it and drains off it goes to a common outlet, such as a river or lake.",
+    "salinity": "Salinity refers to the concentration of dissolved salts in water. High salinity can make groundwater unsuitable for drinking or irrigation.",
+    "nitrate": "Nitrate is a common groundwater contaminant, often resulting from excessive fertilizer use or sewage leakage, and can be harmful to health at high levels.",
+    "arsenic": "Arsenic is a naturally occurring toxic element found in groundwater in certain regions, particularly in the Ganga-Brahmaputra basin, posing serious health risks."
 }
 
 # -------------------- WHY MAP --------------------
@@ -44,7 +50,19 @@ WHY_MAP = {
     "bengaluru": "Rapid expansion into peripheral zones without piped water; over-reliance on private tankers and deep borewells.",
     "chennai": "Coastal location leading to seawater intrusion; high domestic demand following reservoir failures.",
     "gurugram": "Extremely high construction demand and deep extraction for high-rise residential complexes.",
-    "jaipur": "Semi-arid climate coupled with tourism and luxury residential demand exceeding replenishment."
+    "jaipur": "Semi-arid climate coupled with tourism and luxury residential demand exceeding replenishment.",
+    "odisha": "Coastal districts face salinity ingress due to proximity to the sea, while inland areas have limited storage in hard rock aquifers.",
+    "bihar": "High levels of arsenic and fluoride contamination in certain belts; seasonal flooding can also impact groundwater quality.",
+    "assam": "Despite abundant rainfall, certain regions face high iron and arsenic content in shallow aquifers.",
+    "kerala": "Laterite soil has high permeability but low storage, leading to seasonal water scarcity despite high annual rainfall."
+}
+
+# -------------------- CONSERVATION TIPS --------------------
+TIPS = {
+    "conservation": "To conserve groundwater: 1. Install rainwater harvesting systems. 2. Use drip or sprinkler irrigation. 3. Recycle greywater for gardening. 4. Fix leaks promptly.",
+    "harvesting": "Rainwater harvesting involves collecting and storing rainwater from rooftops or ground surfaces to recharge aquifers or for direct use.",
+    "farming": "Sustainable farming tips: 1. Adopt crop rotation. 2. Grow less water-intensive crops like millets. 3. Use mulch to retain soil moisture.",
+    "pollution": "Prevent pollution by: 1. Reducing fertilizer and pesticide use. 2. Proper disposal of hazardous waste. 3. Ensuring septic systems are well-maintained."
 }
 
 # -------------------- EXPLANATION ENGINE --------------------
@@ -95,6 +113,18 @@ async def ask_bot(item: WaterQuery):
                     "* **'Compare [District A] and [District B]'** for more data.",
             "chartData": []
         }
+
+    # 1. WHY logic (Explicit)
+    if "why" in user_input:
+        for key, reason in WHY_MAP.items():
+            if key in user_input:
+                return {"text": f"### Why is **{key.title()}** stressed?\n\n{reason}", "chartData": []}
+
+    # 2. Definition logic (Explicit)
+    if any(w in user_input for w in ["what is", "define", "meaning of"]):
+        for key, value in KNOWLEDGE_BASE.items():
+            if key in user_input:
+                return {"text": f"### {key.title()}\n\n{value}", "chartData": []}
 
     found_data = []
     text_prefix = "the comparison"
@@ -165,18 +195,20 @@ async def ask_bot(item: WaterQuery):
             "chartData": []
         }
 
-    # WHY logic
-    if "why" in user_input:
-        for key, reason in WHY_MAP.items():
-            if key in user_input:
-                return {"text": f"### Why is **{key.title()}** stressed?\n\n{reason}", "chartData": []}
+    # 3. Fallback logic (Implicit keyword matches)
+    for key, tip in TIPS.items():
+        if key in user_input:
+            return {"text": f"### Groundwater {key.title()} Tip\n\n{tip}", "chartData": []}
 
-    # Knowledge Base fallback
     for key, value in KNOWLEDGE_BASE.items():
         if key in user_input:
-            return {"text": value, "chartData": []}
+            return {"text": f"### {key.title()}\n\n{value}", "chartData": []}
 
-    return {"text": "I couldn't find those regions. Try 'Compare Jaipur and Patna'.", "chartData": []}
+    for key, reason in WHY_MAP.items():
+        if key in user_input:
+             return {"text": f"### Why is **{key.title()}** stressed?\n\n{reason}", "chartData": []}
+
+    return {"text": "I couldn't find that information. Try asking about 'conservation tips', 'recharge', or compare two regions like 'Jaipur and Patna'.", "chartData": []}
 @app.get("/")
 def read_root():
     return {
