@@ -3,6 +3,7 @@ import requests
 import json
 import math
 import sqlite3
+from huggingface_hub import InferenceClient
 from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
 from starlette.concurrency import run_in_threadpool
@@ -17,44 +18,37 @@ class SemanticSearch:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(SemanticSearch, cls).__new__(cls)
-            # Use the router endpoint as requested by user to avoid 403/400 errors on Render
-            cls._instance.api_url = "https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2"
+            # Initialize InferenceClient with the router base URL as required for Render
+            cls._instance.model_id = "sentence-transformers/all-MiniLM-L6-v2"
             cls._instance.hf_token = os.getenv("HF_TOKEN")
+            cls._instance.client = InferenceClient(
+                token=cls._instance.hf_token,
+                base_url="https://router.huggingface.co/hf-inference",
+                headers={"X-Wait-For-Model": "true"}
+            )
             cls._instance.entities = []
             cls._instance.embeddings = None
             cls._instance.embeddings_path = os.path.join(os.path.dirname(__file__), "embeddings.json")
         return cls._instance
 
-    def _query_api(self, payload):
-        headers = {
-            "Authorization": f"Bearer {self.hf_token}",
-            "Content-Type": "application/json",
-            "X-Task": "feature-extraction",
-            "X-Wait-For-Model": "true"
-        }
-        
+    def _query_api(self, inputs):
         try:
-            # Task and wait_for_model moved to headers as per router requirements
-            response = requests.post(self.api_url, headers=headers, json=payload, timeout=60)
-            
-            if response.status_code != 200:
-                print(f"HF API Error: {response.status_code} - {response.text}")
-                return None
-            return response.json()
+            # InferenceClient.feature_extraction explicitly requests the feature-extraction task
+            response = self.client.feature_extraction(inputs, model=self.model_id)
+            # Convert to list if it's a numpy array (InferenceClient may return numpy if installed)
+            if hasattr(response, "tolist"):
+                return response.tolist()
+            return response
         except Exception as e:
-            print(f"HF API Request Exception: {e}")
+            print(f"HF API Error via InferenceClient: {e}")
             return None
 
     def encode_entities(self, entities, batch_size=32):
         new_embeddings = []
         for i in range(0, len(entities), batch_size):
             batch = entities[i : i + batch_size]
-            # Explicitly structured payload for feature extraction
-            payload = {
-                "inputs": batch
-            }
             
-            response = self._query_api(payload)
+            response = self._query_api(batch)
             if isinstance(response, list):
                 for item in response:
                     # Logic to flatten: ensure we get a 1D vector per sentence
@@ -73,7 +67,7 @@ class SemanticSearch:
                 json.dump({
                     "entities": self.entities,
                     "embeddings": self.embeddings,
-                    "model": self.api_url
+                    "model": self.model_id
                 }, f)
             print(f"Successfully cached {len(entities)} embeddings.")
     def load_embeddings(self):
@@ -82,7 +76,7 @@ class SemanticSearch:
                 with open(self.embeddings_path, "r") as f:
                     data = json.load(f)
                 # Check if cached for the same model
-                if data.get("model") != self.api_url:
+                if data.get("model") != self.model_id:
                     return False
                 self.entities = data["entities"]
                 self.embeddings = data["embeddings"]
@@ -94,10 +88,8 @@ class SemanticSearch:
     def search(self, query, threshold=0.6):
         if self.embeddings is None or not self.entities:
             return []  
-        payload = {
-            "inputs": [query]
-        }
-        query_embedding_list = self._query_api(payload)
+
+        query_embedding_list = self._query_api([query])
         if not isinstance(query_embedding_list, list) or not query_embedding_list:
             return []
         # Extract and flatten query embedding
