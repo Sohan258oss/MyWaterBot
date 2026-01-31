@@ -226,7 +226,12 @@ export default function App() {
             {/* --- LOADING INDICATOR --- */}
             {loading && (
               <div className="msg bot">
-                <div className="bubble loading">Analyzing groundwater data...</div>
+                <div className="bubble">
+                  <div className="water-loader-container">
+                    <div className="water-loader"></div>
+                    <span className="loading-text">Analyzing groundwater data...</span>
+                  </div>
+                </div>
               </div>
             )}
           </>

@@ -72,6 +72,12 @@ body {
   width: 100%;
   max-width: 1000px;
   margin: 0 auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.chat::-webkit-scrollbar {
+  display: none;
 }
 
 .msg {
@@ -137,6 +143,12 @@ body {
   align-items: center;
   padding: 20px 10px 40px 10px;
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.map-view::-webkit-scrollbar {
+  display: none;
 }
 
 .map-container, .state-map-container {
@@ -464,6 +476,48 @@ button:disabled {
   0% { opacity: 0.6; }
   50% { opacity: 1; }
   100% { opacity: 0.6; }
+}
+
+@keyframes water-wave {
+  0% { transform: translate(-50%, 0) rotate(0deg); }
+  100% { transform: translate(-50%, -2px) rotate(360deg); }
+}
+
+.water-loader-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.water-loader {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--palette-deep-blue);
+  position: relative;
+  overflow: hidden;
+  background: white;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(0, 92, 230, 0.2);
+}
+
+.water-loader::after {
+  content: "";
+  position: absolute;
+  top: 45%;
+  left: 50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(180deg, var(--palette-medium-blue), var(--palette-deep-blue));
+  border-radius: 38%;
+  animation: water-wave 3s infinite linear;
+}
+
+.loading-text {
+  font-weight: 500;
+  color: var(--palette-deep-blue);
+  font-style: italic;
 }
 
 /* ------------------ RESPONSIVENESS ------------------ */
