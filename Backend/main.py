@@ -5,10 +5,95 @@ from pydantic import BaseModel
 import sqlite3
 import requests
 import re
+import os
 from bs4 import BeautifulSoup
-from thefuzz import process, fuzz
+import torch
+from sentence_transformers import SentenceTransformer, util
 
-app = FastAPI()
+class SemanticSearch:
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(SemanticSearch, cls).__new__(cls)
+            # Optimization for low CPU/RAM environment
+            torch.set_num_threads(1)
+            cls._instance.model = SentenceTransformer('paraphrase-MiniLM-L3-v2')
+            cls._instance.entities = []
+            cls._instance.embeddings = None
+            cls._instance.embeddings_path = "embeddings.pt"
+        return cls._instance
+
+    def encode_entities(self, entities):
+        self.entities = entities
+        with torch.no_grad():
+            self.embeddings = self.model.encode(entities, convert_to_tensor=True)
+        torch.save({"entities": self.entities, "embeddings": self.embeddings}, self.embeddings_path)
+
+    def load_embeddings(self):
+        if os.path.exists(self.embeddings_path):
+            try:
+                data = torch.load(self.embeddings_path)
+                self.entities = data["entities"]
+                self.embeddings = data["embeddings"]
+                return True
+            except Exception:
+                return False
+        return False
+
+    def search(self, query, threshold=0.6):
+        if self.embeddings is None or not self.entities:
+            return []
+
+        with torch.no_grad():
+            query_embedding = self.model.encode(query, convert_to_tensor=True)
+            cos_scores = util.cos_sim(query_embedding, self.embeddings)[0]
+
+            results = []
+            for i, score in enumerate(cos_scores):
+                if score >= threshold:
+                    results.append({"name": self.entities[i], "score": score.item()})
+
+            results.sort(key=lambda x: x["score"], reverse=True)
+            return results
+
+from contextlib import asynccontextmanager
+
+semantic_search = SemanticSearch()
+
+# Database path configuration
+DB_PATH = os.path.join(os.path.dirname(__file__), "ingres.db")
+if not os.path.exists(DB_PATH):
+    DB_PATH = "./ingres.db"
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize semantic search
+    if not semantic_search.load_embeddings():
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                cursor = conn.cursor()
+                cursor.execute("PRAGMA table_info(assessments)")
+                cols = [info[1] for info in cursor.fetchall()]
+                state_col = next((c for c in cols if "state" in c.lower()), "State")
+                dist_col = next((c for c in cols if "district" in c.lower()), "District")
+                block_col = next((c for c in cols if "block" in c.lower() or "taluka" in c.lower()), "Block/Taluka")
+
+                cursor.execute(f'SELECT DISTINCT "{state_col}" FROM assessments')
+                states = [r[0] for r in cursor.fetchall() if r[0]]
+                cursor.execute(f'SELECT DISTINCT "{dist_col}" FROM assessments')
+                districts = [r[0] for r in cursor.fetchall() if r[0]]
+                cursor.execute(f'SELECT DISTINCT "{block_col}" FROM assessments')
+                blocks = [r[0] for r in cursor.fetchall() if r[0]]
+
+                all_entities = list(set(states + districts + blocks))
+                if all_entities:
+                    semantic_search.encode_entities(all_entities)
+        except Exception as e:
+            print(f"Error initializing semantic search: {e}")
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 # -------------------- SCRAPER SERVICE --------------------
 def get_latest_news():
@@ -241,7 +326,7 @@ async def ask_bot(item: WaterQuery):
     text_prefix = "the comparison"
 
     try:
-        with sqlite3.connect("./ingres.db") as conn:
+        with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
 
             # --- DYNAMIC COLUMN DETECTION ---
@@ -263,22 +348,18 @@ async def ask_bot(item: WaterQuery):
 
             # 2. Search / Comparison Logic
             else:
+                # Distinguish between levels for query logic
                 cursor.execute(f'SELECT DISTINCT "{state_col}" FROM assessments')
                 states_list = [r[0] for r in cursor.fetchall() if r[0]]
                 cursor.execute(f'SELECT DISTINCT "{dist_col}" FROM assessments')
                 districts_list = [r[0] for r in cursor.fetchall() if r[0]]
-                cursor.execute(f'SELECT DISTINCT "{block_col}" FROM assessments')
-                blocks_list = [r[0] for r in cursor.fetchall() if r[0]]
 
-                all_entities = states_list + districts_list + blocks_list
-                words = user_input.replace("compare", "").replace("vs", " ").replace("and", " ").replace(",", " ").split()
+                semantic_results = semantic_search.search(user_input, threshold=0.6)
                 seen = set()
 
-                for w in words:
-                    if len(w) < 3: continue
-                    best, score = process.extractOne(w, all_entities, scorer=fuzz.token_sort_ratio)
-                    
-                    if score > 80 and best.lower() not in seen:
+                for res in semantic_results:
+                    best = res["name"]
+                    if best.lower() not in seen:
                         seen.add(best.lower())
                         if best in states_list:
                             cursor.execute(f'SELECT AVG("{extract_col}") FROM assessments WHERE "{state_col}" = ?', (best,))
@@ -290,6 +371,8 @@ async def ask_bot(item: WaterQuery):
                         val = cursor.fetchone()[0]
                         if val is not None:
                             found_data.append({"name": best, "extraction": round(val, 2)})
+
+                found_data = found_data[:5]
 
     except Exception as e:
         return {
@@ -346,8 +429,11 @@ async def ask_bot(item: WaterQuery):
                  "suggestions": get_suggestions(user_input)
              }
 
+    # 4. Final Fallback: News Scraper
+    news = await run_in_threadpool(get_latest_news)
+    news_str = "\n".join([f"• {item}" for item in news])
     return {
-        "text": "I couldn't find that information. Try asking about 'conservation tips', 'recharge', or compare two regions like 'Jaipur and Patna'.",
+        "text": f"I couldn't find specific data for your query, but here are the latest groundwater updates:\n\n{news_str}",
         "chartData": [],
         "suggestions": get_suggestions(user_input)
     }
