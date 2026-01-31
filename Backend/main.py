@@ -24,20 +24,15 @@ class SemanticSearch:
         return cls._instance
 
     def _query_api(self, payload):
-        # 1. Ensure the headers are exactly what the Router expects
         headers = {
             "Authorization": f"Bearer {self.hf_token}",
             "Content-Type": "application/json",
-            "x-use-cache": "true"
+            # THESE HEADERS FIX THE 400 ERROR
+            "X-Wait-For-Model": "true",
+            "X-Inference-Endpoint": "feature-extraction" 
         }
-        # 2. Add the wait_for_model option inside the payload if not present
-        if isinstance(payload, dict):
-            if "options" not in payload:
-                payload["options"] = {"wait_for_model": True}
-            else:
-                payload["options"]["wait_for_model"] = True
+        
         try:
-            # Note: The URL must be the 'router.huggingface.co' one we discussed
             response = requests.post(self.api_url, headers=headers, json=payload, timeout=60)
             if response.status_code != 200:
                 print(f"HF API Error: {response.status_code} - {response.text}")
@@ -51,15 +46,18 @@ class SemanticSearch:
         new_embeddings = []
         for i in range(0, len(entities), batch_size):
             batch = entities[i : i + batch_size]
-            payload = {
-                "inputs": batch,
-                "options": {"wait_for_model": True}
-            }
+            payload = {"inputs": batch} # Keep it simple, headers handle the rest
             response = self._query_api(payload)
+            
             if isinstance(response, list):
-                new_embeddings.extend(response)
+                for item in response:
+                    # Logic to flatten nested lists if the API returns 3D instead of 2D
+                    temp = item
+                    while isinstance(temp, list) and len(temp) > 0 and isinstance(temp[0], list):
+                        temp = temp[0]
+                    new_embeddings.append(temp)
             else:
-                print(f"Error encoding entities: {response}")
+                print(f"Error encoding batch starting at {i}: {response}")
                 return
 
         if len(new_embeddings) == len(entities):
@@ -71,6 +69,7 @@ class SemanticSearch:
                     "embeddings": self.embeddings,
                     "model": self.api_url
                 }, f)
+            print(f"Successfully cached {len(entities)} embeddings.")
 
     def load_embeddings(self):
         if os.path.exists(self.embeddings_path):
@@ -90,17 +89,16 @@ class SemanticSearch:
     def search(self, query, threshold=0.6):
         if self.embeddings is None or not self.entities:
             return []
-        payload = {
-            "inputs": [query], 
-            "options": {"wait_for_model": True}
-        }
-        query_embedding = self._query_api(payload)
-        if query_embedding is None or not isinstance(query_embedding, list):
-            print("Search failed: No embedding returned from API")
+        
+        payload = {"inputs": [query]}
+        query_embedding_list = self._query_api(payload)
+
+        if not isinstance(query_embedding_list, list) or not query_embedding_list:
             return []
-        if len(query_embedding) > 0 and isinstance(query_embedding[0], list):
-            query_embedding = query_embedding[0]
-        while len(query_embedding) > 0 and isinstance(query_embedding[0], list):
+
+        # Flatten the query embedding
+        query_embedding = query_embedding_list[0]
+        while isinstance(query_embedding, list) and len(query_embedding) > 0 and isinstance(query_embedding[0], list):
             query_embedding = query_embedding[0]
 
         def cosine_similarity(a, b):
@@ -412,9 +410,18 @@ async def ask_bot(item: WaterQuery, request: Request):
 
     if results:
         best_match = results[0]["name"]
-
-        # 4. Direct Answer: Knowledge/Tips (Priority 2)
         match_key = best_match.lower()
+
+        # --- A. CHECK FOR "WHY" INTENT FIRST ---
+        # This ensures "Why is Punjab stressed?" doesn't just return a data table.
+        if "why" in user_input and match_key in WHY_MAP:
+            return {
+                "text": f"### Why is **{best_match.title()}** stressed?\n\n{WHY_MAP[match_key]}",
+                "chartData": [],
+                "suggestions": get_suggestions(user_input)
+            }
+
+        # --- B. CHECK KNOWLEDGE BASE (Definitions) ---
         if match_key in KNOWLEDGE_BASE:
             return {
                 "text": f"### {best_match.title()}\n\n{KNOWLEDGE_BASE[match_key]}",
@@ -422,16 +429,10 @@ async def ask_bot(item: WaterQuery, request: Request):
                 "suggestions": get_suggestions(user_input)
             }
 
+        # --- C. CHECK CONSERVATION TIPS ---
         if match_key in TIPS:
             return {
                 "text": f"### {best_match.title()} Tip\n\n{TIPS[match_key]}",
-                "chartData": [],
-                "suggestions": get_suggestions(user_input)
-            }
-
-        if match_key in WHY_MAP and "why" in user_input:
-            return {
-                "text": f"### Why is **{best_match.title()}** stressed?\n\n{WHY_MAP[match_key]}",
                 "chartData": [],
                 "suggestions": get_suggestions(user_input)
             }
