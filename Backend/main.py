@@ -16,7 +16,7 @@ class SemanticSearch:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(SemanticSearch, cls).__new__(cls)
-            cls._instance.api_url = "https://api-inference.huggingface.co/models/sentence-transformers/paraphrase-MiniLM-L3-v2"
+            cls._instance.api_url = "https://router.huggingface.co/hf-inference/models/sentence-transformers/paraphrase-MiniLM-L3-v2"
             cls._instance.hf_token = os.getenv("HF_TOKEN")
             cls._instance.entities = []
             cls._instance.embeddings = None
