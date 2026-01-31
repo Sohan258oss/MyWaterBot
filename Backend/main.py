@@ -24,11 +24,20 @@ class SemanticSearch:
         return cls._instance
 
     def _query_api(self, payload):
+        # 1. Ensure the headers are exactly what the Router expects
         headers = {
             "Authorization": f"Bearer {self.hf_token}",
-            "X-Task": "feature-extraction"
-        } if self.hf_token else {"X-Task": "feature-extraction"}
+            "Content-Type": "application/json",
+            "x-use-cache": "true"
+        }
+        # 2. Add the wait_for_model option inside the payload if not present
+        if isinstance(payload, dict):
+            if "options" not in payload:
+                payload["options"] = {"wait_for_model": True}
+            else:
+                payload["options"]["wait_for_model"] = True
         try:
+            # Note: The URL must be the 'router.huggingface.co' one we discussed
             response = requests.post(self.api_url, headers=headers, json=payload, timeout=60)
             if response.status_code != 200:
                 print(f"HF API Error: {response.status_code} - {response.text}")
@@ -81,18 +90,17 @@ class SemanticSearch:
     def search(self, query, threshold=0.6):
         if self.embeddings is None or not self.entities:
             return []
-
         payload = {
-            "inputs": query,
+            "inputs": [query], 
             "options": {"wait_for_model": True}
         }
         query_embedding = self._query_api(payload)
-
-        if not isinstance(query_embedding, list):
+        if query_embedding is None or not isinstance(query_embedding, list):
+            print("Search failed: No embedding returned from API")
             return []
-
-        # Feature Extraction returns List[float] for a single string or List[List[float]]
         if len(query_embedding) > 0 and isinstance(query_embedding[0], list):
+            query_embedding = query_embedding[0]
+        while len(query_embedding) > 0 and isinstance(query_embedding[0], list):
             query_embedding = query_embedding[0]
 
         def cosine_similarity(a, b):
