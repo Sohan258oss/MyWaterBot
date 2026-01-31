@@ -4,5 +4,3 @@ pandas
 pydantic
 requests
 beautifulsoup4
-sentence-transformers
-torch

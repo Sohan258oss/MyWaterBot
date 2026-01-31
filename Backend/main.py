@@ -7,8 +7,8 @@ import requests
 import re
 import os
 from bs4 import BeautifulSoup
-import torch
-from sentence_transformers import SentenceTransformer, util
+import json
+import math
 
 class SemanticSearch:
     _instance = None
@@ -16,28 +16,49 @@ class SemanticSearch:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(SemanticSearch, cls).__new__(cls)
-            # Optimization for low CPU/RAM environment
-            torch.set_num_threads(1)
-            cls._instance.model = SentenceTransformer('paraphrase-MiniLM-L3-v2')
+            cls._instance.api_url = "https://api-inference.huggingface.co/models/sentence-transformers/paraphrase-MiniLM-L3-v2"
+            cls._instance.hf_token = os.getenv("HF_TOKEN")
             cls._instance.entities = []
             cls._instance.embeddings = None
-            cls._instance.embeddings_path = "embeddings.pt"
+            cls._instance.embeddings_path = os.path.join(os.path.dirname(__file__), "embeddings.json")
         return cls._instance
+
+    def _query_api(self, payload):
+        headers = {"Authorization": f"Bearer {self.hf_token}"} if self.hf_token else {}
+        try:
+            response = requests.post(self.api_url, headers=headers, json=payload, timeout=10)
+            if response.status_code != 200:
+                print(f"HF API Error: {response.status_code} - {response.text}")
+                return None
+            return response.json()
+        except Exception as e:
+            print(f"HF API Request Exception: {e}")
+            return None
 
     def encode_entities(self, entities):
         self.entities = entities
-        with torch.no_grad():
-            self.embeddings = self.model.encode(entities, convert_to_tensor=True)
-        torch.save({"entities": self.entities, "embeddings": self.embeddings}, self.embeddings_path)
+        payload = {
+            "inputs": entities,
+            "options": {"wait_for_model": True}
+        }
+        response = self._query_api(payload)
+        if isinstance(response, list):
+            self.embeddings = response
+            with open(self.embeddings_path, "w") as f:
+                json.dump({"entities": self.entities, "embeddings": self.embeddings}, f)
+        else:
+            print(f"Error encoding entities: {response}")
 
     def load_embeddings(self):
         if os.path.exists(self.embeddings_path):
             try:
-                data = torch.load(self.embeddings_path)
+                with open(self.embeddings_path, "r") as f:
+                    data = json.load(f)
                 self.entities = data["entities"]
                 self.embeddings = data["embeddings"]
                 return True
-            except Exception:
+            except Exception as e:
+                print(f"Error loading embeddings: {e}")
                 return False
         return False
 
@@ -45,17 +66,33 @@ class SemanticSearch:
         if self.embeddings is None or not self.entities:
             return []
 
-        with torch.no_grad():
-            query_embedding = self.model.encode(query, convert_to_tensor=True)
-            cos_scores = util.cos_sim(query_embedding, self.embeddings)[0]
+        payload = {
+            "inputs": query,
+            "options": {"wait_for_model": True}
+        }
+        query_embedding = self._query_api(payload)
 
-            results = []
-            for i, score in enumerate(cos_scores):
-                if score >= threshold:
-                    results.append({"name": self.entities[i], "score": score.item()})
+        if not isinstance(query_embedding, list):
+            return []
 
-            results.sort(key=lambda x: x["score"], reverse=True)
-            return results
+        # Feature Extraction returns List[float] for a single string or List[List[float]]
+        if len(query_embedding) > 0 and isinstance(query_embedding[0], list):
+            query_embedding = query_embedding[0]
+
+        def cosine_similarity(a, b):
+            dot_product = sum(x * y for x, y in zip(a, b))
+            mag_a = math.sqrt(sum(x * x for x in a))
+            mag_b = math.sqrt(sum(y * y for y in b))
+            return dot_product / (mag_a * mag_b) if mag_a * mag_b > 0 else 0
+
+        results = []
+        for i, emb in enumerate(self.embeddings):
+            score = cosine_similarity(query_embedding, emb)
+            if score >= threshold:
+                results.append({"name": self.entities[i], "score": score})
+
+        results.sort(key=lambda x: x["score"], reverse=True)
+        return results
 
 from contextlib import asynccontextmanager
 
