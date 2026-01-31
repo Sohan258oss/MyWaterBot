@@ -28,11 +28,13 @@ class SemanticSearch:
     def _query_api(self, payload):
         headers = {
             "Authorization": f"Bearer {self.hf_token}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "X-Task": "feature-extraction",
+            "X-Wait-For-Model": "true"
         }
         
         try:
-            # We move wait_for_model into the payload options for better compatibility
+            # Task and wait_for_model moved to headers as per router requirements
             response = requests.post(self.api_url, headers=headers, json=payload, timeout=60)
             
             if response.status_code != 200:
@@ -93,8 +95,7 @@ class SemanticSearch:
         if self.embeddings is None or not self.entities:
             return []  
         payload = {
-            "inputs": [query],
-            "options": {"wait_for_model": True}
+            "inputs": [query]
         }
         query_embedding_list = self._query_api(payload)
         if not isinstance(query_embedding_list, list) or not query_embedding_list:
