@@ -53,6 +53,7 @@ export default function App() {
           type: "bot",
           text: data.text,
           chartData: data.chartData || [],
+          imageUrl: data.imageUrl || null,
           suggestions: data.suggestions || []
         }
       ]);
@@ -146,6 +147,12 @@ export default function App() {
                 <div className="bubble">
                   {m.type === "bot" ? formatText(m.text) : m.text}
                 </div>
+
+                {m.type === "bot" && m.imageUrl && (
+                  <div className="bot-image-container">
+                    <img src={m.imageUrl} alt="Relevant groundwater visual" className="bot-image" />
+                  </div>
+                )}
 
                 {m.type === "bot" && m.suggestions && m.suggestions.length > 0 && (
                   <div className="bot-suggestions">

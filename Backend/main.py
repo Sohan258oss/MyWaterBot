@@ -10,6 +10,7 @@ from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from bs4 import BeautifulSoup
 from fastapi.middleware.cors import CORSMiddleware
+from duckduckgo_search import DDGS
 
 # -------------------- CORRECTED SEMANTIC SEARCH --------------------
 class SemanticSearch:
@@ -150,7 +151,37 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# -------------------- SCRAPER SERVICE --------------------
+# -------------------- SERVICES --------------------
+def get_wikipedia_image(query):
+    """Fallback to fetch image from Wikipedia if search fails."""
+    try:
+        # Simple heuristic: capitalize first letter for Wikipedia
+        term = query.title().replace(' ', '_')
+        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{term}"
+        headers = {"User-Agent": "INGRES_AI_Bot/1.0 (support@ingres.ai)"}
+        response = requests.get(url, headers=headers, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if "thumbnail" in data:
+                return data["thumbnail"]["source"]
+    except Exception:
+        pass
+    return None
+
+def get_image_url(query):
+    """Fetches a relevant image URL using DuckDuckGo search with Wikipedia fallback."""
+    try:
+        with DDGS() as ddgs:
+            # We add 'groundwater' or similar context to refine results if needed,
+            # but for specific terms like 'aquifer', 'borewell', it should be fine.
+            results = ddgs.images(query, max_results=1)
+            if results:
+                return results[0]['image']
+    except Exception as e:
+        print(f"Image search error for '{query}': {e}")
+
+    return get_wikipedia_image(query)
+
 def get_latest_news():
     query = "groundwater levels India"
     url = f"https://www.google.com/search?q={query.replace(' ', '+')}&tbm=nws"
@@ -407,25 +438,31 @@ async def ask_bot(item: WaterQuery, request: Request):
         # --- A. CHECK FOR "WHY" INTENT FIRST ---
         # This ensures "Why is Punjab stressed?" doesn't just return a data table.
         if "why" in user_input and match_key in WHY_MAP:
+            img_url = await run_in_threadpool(get_image_url, f"{best_match} groundwater stress")
             return {
                 "text": f"### Why is **{best_match.title()}** stressed?\n\n{WHY_MAP[match_key]}",
                 "chartData": [],
+                "imageUrl": img_url,
                 "suggestions": get_suggestions(user_input)
             }
 
         # --- B. CHECK KNOWLEDGE BASE (Definitions) ---
         if match_key in KNOWLEDGE_BASE:
+            img_url = await run_in_threadpool(get_image_url, best_match)
             return {
                 "text": f"### {best_match.title()}\n\n{KNOWLEDGE_BASE[match_key]}",
                 "chartData": [],
+                "imageUrl": img_url,
                 "suggestions": get_suggestions(user_input)
             }
 
         # --- C. CHECK CONSERVATION TIPS ---
         if match_key in TIPS:
+            img_url = await run_in_threadpool(get_image_url, best_match)
             return {
                 "text": f"### {best_match.title()} Tip\n\n{TIPS[match_key]}",
                 "chartData": [],
+                "imageUrl": img_url,
                 "suggestions": get_suggestions(user_input)
             }
 
@@ -483,9 +520,13 @@ async def ask_bot(item: WaterQuery, request: Request):
                 warning_text = "\n\n" + "\n".join(contaminant_warnings) if contaminant_warnings else ""
                 intro = "Groundwater extraction measures usage relative to natural recharge.\n\n" if is_usage_query else ""
 
+                # Fetch image for the first location found
+                img_url = await run_in_threadpool(get_image_url, f"{found_data[0]['name']} India")
+
                 return {
                     "text": f"{intro}Results for your search:\n\n{explanations}{warning_text}\n\nWould you like a chart? (Yes/No)",
                     "chartData": [],
+                    "imageUrl": img_url,
                     "suggestions": get_suggestions(user_input, found_data)
                 }
 
@@ -494,9 +535,11 @@ async def ask_bot(item: WaterQuery, request: Request):
 
         # Fallback for WHY_MAP if "why" wasn't in query but it's the best match and not a location
         if match_key in WHY_MAP:
+            img_url = await run_in_threadpool(get_image_url, f"{best_match} groundwater stress")
             return {
                 "text": f"### Why is **{best_match.title()}** stressed?\n\n{WHY_MAP[match_key]}",
                 "chartData": [],
+                "imageUrl": img_url,
                 "suggestions": get_suggestions(user_input)
             }
 

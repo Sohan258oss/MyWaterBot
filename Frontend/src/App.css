@@ -421,6 +421,32 @@ body {
   margin-bottom: 4px;
 }
 
+/* ------------------ BOT IMAGES ------------------ */
+.bot-image-container {
+  margin-top: 12px;
+  width: 100%;
+  max-width: 400px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--palette-pale-blue);
+  background: white;
+  animation: fadeIn 0.4s ease-in;
+}
+
+.bot-image {
+  width: 100%;
+  height: auto;
+  max-height: 300px;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.3s ease;
+}
+
+.bot-image:hover {
+  transform: scale(1.02);
+}
+
 /* ------------------ INPUT AREA ------------------ */
 .input-box {
   display: flex;
