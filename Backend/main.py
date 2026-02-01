@@ -350,34 +350,90 @@ TIPS = {
     "well recharging": "Redirect surplus monsoon runoff into defunct dug wells to recharge local aquifers.",
 }
 
+# -------------------- LAYERED RESPONSES --------------------
+LAYERED_METADATA = {
+    "groundwater": {
+        "why": "It's the primary source of water for half of the world's population and essential for agriculture.",
+        "impact": "Depletion threatens food security and domestic water supply.",
+        "tip": "Reduce wastage in households and adopt rainwater harvesting."
+    },
+    "aquifer": {
+        "why": "Acts as a natural underground reservoir for storing water.",
+        "impact": "Over-extraction can cause land subsidence and permanent loss of storage capacity.",
+        "tip": "Protect recharge areas from urban sprawl and pollution."
+    },
+    "recharge": {
+        "why": "It's the natural process that keeps our groundwater levels stable.",
+        "impact": "Low recharge leads to dropping water tables and drying wells.",
+        "tip": "Use check dams and percolation tanks to enhance natural recharge."
+    },
+    "extraction": {
+        "why": "High extraction rates indicate we are using water faster than nature can replenish it.",
+        "impact": "Leads to water stress, saline ingress in coastal areas, and higher pumping costs.",
+        "tip": "Switch to water-efficient irrigation methods like drip or sprinklers."
+    }
+}
+
+def format_layered_response(term, definition):
+    meta = LAYERED_METADATA.get(term.lower(), {
+        "why": "Crucial for understanding water sustainability and resource management.",
+        "impact": "Directly affects long-term water availability and quality for future generations.",
+        "tip": "Support local water conservation initiatives and stay informed about water levels."
+    })
+    return (
+        f"**Definition:** {definition}\n\n"
+        f"**Why it matters:** {meta['why']}\n\n"
+        f"**Impact/Interpretation:** {meta['impact']}\n\n"
+        f"**Actionable Tip:** {meta['tip']}"
+    )
+
 # -------------------- EXPLANATION ENGINE --------------------
 def explain_extraction(name, value):
     if value <= 70:
         status = "relatively safe"
         meaning = "groundwater use is within sustainable limits"
+        impact = "Minimal impact on water table; sustainable for future use."
+        tip = "Maintain current practices and consider rainwater harvesting to stay safe."
     elif value <= 100:
         status = "stressed"
         meaning = "water usage is close to or exceeding recharge capacity"
+        impact = "Lowering water tables; increased pumping costs; potential for seasonal scarcity."
+        tip = "Reduce water-intensive crops; adopt drip irrigation; implement community-led recharge."
     else:
         status = "over-exploited"
         meaning = "groundwater is being extracted much faster than it can recharge"
+        impact = "Rapidly falling water levels; drying borewells; long-term ecological damage; potential land subsidence."
+        tip = "Urgent: Stop new borewells; shift to millets; mandatory rainwater harvesting; artificial recharge."
 
     return (
-        f"{name.title()} has an average groundwater extraction of {value}%. "
-        f"This places it in a **{status}** category, meaning {meaning}."
+        f"**Definition:** Average groundwater extraction of {value}% for {name.title()}.\n\n"
+        f"**Why it matters:** It indicates the balance between usage and natural replenishment.\n\n"
+        f"**Impact/Interpretation:** This places it in a **{status}** category. {meaning}. {impact}\n\n"
+        f"**Actionable Tip:** {tip}"
     )
 
 # -------------------- SUGGESTION ENGINE --------------------
 def get_suggestions(user_input, found_data=None):
     suggestions = ["Conservation tips", "What is an aquifer?", "Show India map"]
+
     if found_data:
-        suggestions.insert(0, "Show chart")
-        for d in found_data[:2]:
-            suggestions.append(f"Why is {d['name']} stressed?")
+        # Contextual next-steps for locations
+        loc_name = found_data[0]['name'].title()
+        suggestions = [
+            f"Why is {loc_name} stressed?",
+            f"Show trend for {loc_name}",
+            f"How to reduce extraction in {loc_name}"
+        ]
+        if len(found_data) > 1:
+            suggestions.append("Show chart")
     elif "why" in user_input:
         suggestions.insert(0, "Compare Punjab and Bihar")
     elif any(k in user_input for k in ["tip", "conservation", "harvesting", "farming"]):
         suggestions.insert(0, "Search a state like Punjab")
+    elif "aquifer" in user_input:
+        suggestions.insert(0, "What is a water table?")
+    elif "groundwater" in user_input:
+        suggestions.insert(0, "How is groundwater recharged?")
 
     seen = set()
     unique = []
@@ -449,8 +505,9 @@ async def ask_bot(item: WaterQuery, request: Request):
         # --- B. CHECK KNOWLEDGE BASE (Definitions) ---
         if match_key in KNOWLEDGE_BASE:
             img_url = await run_in_threadpool(get_image_url, best_match)
+            layered_text = format_layered_response(best_match, KNOWLEDGE_BASE[match_key])
             return {
-                "text": f"### {best_match.title()}\n\n{KNOWLEDGE_BASE[match_key]}",
+                "text": f"### {best_match.title()}\n\n{layered_text}",
                 "chartData": [],
                 "imageUrl": img_url,
                 "suggestions": get_suggestions(user_input)
@@ -509,22 +566,35 @@ async def ask_bot(item: WaterQuery, request: Request):
 
             if found_data:
                 last_data_cache["data"] = found_data
-                contaminant_warnings = []
+
+                unified_responses = []
                 for d in found_data:
                     name_lower = d["name"].lower()
+
+                    # 1. Extraction Explanation (Layered)
+                    explanation = explain_extraction(d["name"], d["extraction"])
+
+                    # 2. Root Causes from WHY_MAP
+                    cause_text = ""
+                    if name_lower in WHY_MAP:
+                        cause_text = f"\n\n**Root Causes:** {WHY_MAP[name_lower]}"
+
+                    # 3. Contaminant Warnings
+                    contaminant_text = ""
                     if name_lower in CONTAMINANT_DATA:
                         cons = ", ".join(CONTAMINANT_DATA[name_lower])
-                        contaminant_warnings.append(f"⚠️ Note: {d['name']} has reported high levels of {cons}.")
+                        contaminant_text = f"\n\n⚠️ **Note:** {d['name']} has reported high levels of {cons}."
 
-                explanations = "\n\n".join([explain_extraction(d["name"], d["extraction"]) for d in found_data])
-                warning_text = "\n\n" + "\n".join(contaminant_warnings) if contaminant_warnings else ""
+                    unified_responses.append(f"### {d['name'].title()}\n{explanation}{cause_text}{contaminant_text}")
+
+                full_response = "\n\n---\n\n".join(unified_responses)
                 intro = "Groundwater extraction measures usage relative to natural recharge.\n\n" if is_usage_query else ""
 
                 # Fetch image for the first location found
                 img_url = await run_in_threadpool(get_image_url, f"{found_data[0]['name']} India")
 
                 return {
-                    "text": f"{intro}Results for your search:\n\n{explanations}{warning_text}\n\nWould you like a chart? (Yes/No)",
+                    "text": f"{intro}{full_response}\n\nWould you like a chart? (Yes/No)",
                     "chartData": [],
                     "imageUrl": img_url,
                     "suggestions": get_suggestions(user_input, found_data)
