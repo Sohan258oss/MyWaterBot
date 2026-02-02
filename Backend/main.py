@@ -20,7 +20,7 @@ class SemanticSearch:
         if cls._instance is None:
             cls._instance = super(SemanticSearch, cls).__new__(cls)
             # Initialize InferenceClient with the router base URL as required for Render
-            cls._instance.model_id = "sentence-transformers/all-MiniLM-L6-v2"
+            cls._instance.model_id = "sentence-transformers/all-mpnet-base-v2"
             cls._instance.hf_token = os.getenv("HF_TOKEN")
             cls._instance.client = InferenceClient(
                 token=cls._instance.hf_token,
