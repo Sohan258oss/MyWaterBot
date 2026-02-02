@@ -29,36 +29,38 @@ body {
 
 /* ------------------ HEADER ------------------ */
 .header {
-  padding: 14px;
+  padding: 1rem 2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: linear-gradient(90deg, var(--palette-medium-blue), var(--palette-deep-blue));
-  color: white;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid #e5e7eb;
   z-index: 10;
 }
 
 .header-title {
-  font-size: 1.3rem;
+  color: navy;
+  font-size: 1.2rem;
   font-weight: 600;
   letter-spacing: 0.5px;
 }
 
-.map-toggle-btn {
-  background: white;
-  color: var(--palette-deep-blue);
-  border: none;
-  padding: 8px 16px;
-  border-radius: 20px;
+.header .map-toggle-btn {
+  background: transparent;
+  color: navy;
+  border: 1px solid navy;
+  padding: 8px 20px;
+  border-radius: 35px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
   font-size: 0.9rem;
 }
 
-.map-toggle-btn:hover {
-  background: var(--palette-very-pale-blue);
+.header .map-toggle-btn:hover {
+  background: rgba(0, 0, 128, 0.05);
   transform: scale(1.05);
 }
 
@@ -608,11 +610,11 @@ button:not(.send-btn):active {
 /* ------------------ RESPONSIVENESS ------------------ */
 @media (max-width: 768px) {
   .header-title {
-    font-size: 1.1rem;
+    font-size: 1rem;
   }
 
-  .map-toggle-btn {
-    padding: 6px 12px;
+  .header .map-toggle-btn {
+    padding: 6px 16px;
     font-size: 0.8rem;
   }
 
