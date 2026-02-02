@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import GroundwaterMap from "./GroundwaterMap";
 import WebGLWaves from "./components/WebGLWaves";
 import MapLegend from "./components/MapLegend";
-import DistrictMapChat from "./components/DistrictMapChat";
 import { Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -98,8 +97,6 @@ export default function App() {
           chartData: data.chartData || [],
           imageUrl: data.imageUrl || null,
           showLegend: data.showLegend || false,
-          districtData: data.districtData || null,
-          stateName: data.stateName || null,
           suggestions: data.suggestions || []
         }
       ]);
@@ -203,19 +200,12 @@ export default function App() {
                 {m.type === "bot" && m.imageUrl && (
                   <div className="bot-image-container">
                     <img src={m.imageUrl} alt="Relevant groundwater visual" className="bot-image" />
-                    {m.showLegend && !m.districtData && (
+                    {m.showLegend && (
                       <div className="chat-legend-wrapper">
                         <MapLegend />
                       </div>
                     )}
                   </div>
-                )}
-
-                {m.type === "bot" && m.districtData && (
-                  <DistrictMapChat
-                    stateName={m.stateName}
-                    districtData={m.districtData}
-                  />
                 )}
 
                 {m.type === "bot" && m.suggestions && m.suggestions.length > 0 && (

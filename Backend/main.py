@@ -573,18 +573,15 @@ async def ask_bot(item: WaterQuery, request: Request):
 
         # 5. Data Lookup: Location (Priority 3)
         found_data = []
-        district_data = None
-        state_name_for_map = None
-
         try:
             with sqlite3.connect(DB_PATH) as conn:
                 cursor = conn.cursor()
                 cursor.execute("PRAGMA table_info(assessments)")
                 cols = [info[1] for info in cursor.fetchall()]
-                state_col = next((c for c in cols if "state" in c.lower()), "state")
-                dist_col = next((c for c in cols if "district" in c.lower()), "district_name")
-                block_col = next((c for c in cols if "block" in c.lower() or "taluka" in c.lower()), "block_name")
-                extract_col = next((c for c in cols if "extraction" in c.lower() or "stage" in c.lower()), "extraction")
+                state_col = next((c for c in cols if "state" in c.lower()), "State")
+                dist_col = next((c for c in cols if "district" in c.lower()), "District")
+                block_col = next((c for c in cols if "block" in c.lower() or "taluka" in c.lower()), "Block/Taluka")
+                extract_col = next((c for c in cols if "extraction" in c.lower() or "stage" in c.lower()), "Stage of Ground Water Extraction (%)")
 
                 states_list = getattr(request.app.state, "states_list", [])
                 districts_list = getattr(request.app.state, "districts_list", [])
@@ -599,27 +596,19 @@ async def ask_bot(item: WaterQuery, request: Request):
                     seen.add(name_low)
 
                     if name_low in states_map:
-                        full_state_name = states_map[name_low]
-                        cursor.execute(f'SELECT AVG("{extract_col}") FROM assessments WHERE "{state_col}" = ?', (full_state_name,))
-                        val = cursor.fetchone()
-                        if val and val[0] is not None:
-                            found_data.append({"name": full_state_name, "extraction": round(val[0], 2)})
-                            # If it's a state, fetch all districts for the map/chat view
-                            cursor.execute(f'SELECT "{dist_col}", AVG("{extract_col}") FROM assessments WHERE "{state_col}" = ? GROUP BY "{dist_col}"', (full_state_name,))
-                            district_data = [{"name": r[0].title(), "extraction": round(r[1], 2)} for r in cursor.fetchall() if r[0]]
-                            state_name_for_map = full_state_name
+                        cursor.execute(f'SELECT AVG("{extract_col}") FROM assessments WHERE "{state_col}" = ?', (states_map[name_low],))
                     elif name_low in districts_map:
                         cursor.execute(f'SELECT AVG("{extract_col}") FROM assessments WHERE "{dist_col}" = ?', (districts_map[name_low],))
-                        val = cursor.fetchone()
-                        if val and val[0] is not None:
-                            found_data.append({"name": name, "extraction": round(val[0], 2)})
                     elif name_low in KNOWLEDGE_BASE or name_low in TIPS or name_low in WHY_MAP:
+                        # If it's a key in our dicts, we might have already handled it as Priority 2.
+                        # We skip it here if it doesn't match a location.
                         continue
                     else:
                         cursor.execute(f'SELECT "{extract_col}" FROM assessments WHERE "{block_col}" = ?', (name,))
-                        val = cursor.fetchone()
-                        if val and val[0] is not None:
-                            found_data.append({"name": name, "extraction": round(val[0], 2)})
+
+                    val = cursor.fetchone()
+                    if val and val[0] is not None:
+                        found_data.append({"name": name, "extraction": round(val[0], 2)})
 
                     if len(found_data) >= 5: break
 
@@ -662,8 +651,6 @@ async def ask_bot(item: WaterQuery, request: Request):
                 return {
                     "text": f"{intro}{full_response}\n\nWould you like a chart? (Yes/No)",
                     "chartData": [],
-                    "districtData": district_data,
-                    "stateName": state_name_for_map,
                     "imageUrl": img_url,
                     "showLegend": True,
                     "suggestions": get_suggestions(user_input, found_data)
