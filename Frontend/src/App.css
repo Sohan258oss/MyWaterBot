@@ -33,7 +33,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 249, 240, 0.8);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid #e5e7eb;
@@ -45,6 +45,27 @@ body {
   font-size: 1.2rem;
   font-weight: 600;
   letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+}
+
+.brand-main {
+  white-space: nowrap;
+}
+
+.brand-suffix {
+  display: inline-block;
+  opacity: 1;
+  max-width: 400px;
+  transition: max-width 1s ease-in-out, opacity 0.8s ease-in-out, transform 0.8s ease-in-out;
+  white-space: pre;
+  overflow: hidden;
+}
+
+.brand-suffix.retreat {
+  opacity: 0;
+  max-width: 0;
+  transform: translateX(-20px);
 }
 
 .header .map-toggle-btn {

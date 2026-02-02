@@ -19,7 +19,43 @@ export default function App() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [displayedMain, setDisplayedMain] = useState("");
+  const [displayedSuffix, setDisplayedSuffix] = useState("");
+  const [isRetreating, setIsRetreating] = useState(false);
   const bottomRef = useRef(null);
+
+  useEffect(() => {
+    const mainText = "MyWaterBot";
+    const suffixText = " - AI Groundwater Assistant";
+    let i = 0;
+    let typeSuffixInterval;
+
+    const typeMainInterval = setInterval(() => {
+      if (i < mainText.length) {
+        setDisplayedMain(mainText.slice(0, i + 1));
+        i++;
+      } else {
+        clearInterval(typeMainInterval);
+        let j = 0;
+        typeSuffixInterval = setInterval(() => {
+          if (j < suffixText.length) {
+            setDisplayedSuffix(suffixText.slice(0, j + 1));
+            j++;
+          } else {
+            clearInterval(typeSuffixInterval);
+            setTimeout(() => {
+              setIsRetreating(true);
+            }, 1500);
+          }
+        }, 40);
+      }
+    }, 60);
+
+    return () => {
+      clearInterval(typeMainInterval);
+      clearInterval(typeSuffixInterval);
+    };
+  }, []);
 
   // Auto-scroll to bottom whenever messages change
   useEffect(() => {
@@ -92,7 +128,12 @@ export default function App() {
     <div className="app">
       <WebGLWaves />
       <header className="header">
-        <div className="header-title">MyWaterBot AI Groundwater Assistant</div>
+        <div className="header-title">
+          <span className="brand-main">{displayedMain}</span>
+          <span className={`brand-suffix ${isRetreating ? "retreat" : ""}`}>
+            {displayedSuffix}
+          </span>
+        </div>
         <button
           className="map-toggle-btn"
           onClick={() => setShowMap(!showMap)}
