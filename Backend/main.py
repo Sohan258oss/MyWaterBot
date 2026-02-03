@@ -3,6 +3,7 @@ import requests
 import json
 import math
 import sqlite3
+import re
 from huggingface_hub import InferenceClient
 from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
@@ -477,6 +478,28 @@ def get_suggestions(user_input, found_data=None):
     return unique[:3]
 
 # -------------------- VISUAL UTILS --------------------
+ACTION_KEYWORDS = ["reduce", "how to", "solution", "steps", "ways", "minimize", "conserve", "prevent", "action", "improvement", "management", "reduction", "curb", "save"]
+CAUSE_KEYWORDS = ["why", "cause", "reason", "factor", "trigger", "drivers", "stressed"]
+
+def detect_action_intent(user_input):
+    # Check for multi-word phrases first
+    if "how to" in user_input.lower():
+        return True
+
+    # Check for other keywords as whole words
+    for k in ACTION_KEYWORDS:
+        if k == "how to": continue
+        if re.search(rf"\b{k}\b", user_input, re.IGNORECASE):
+            return True
+    return False
+
+def detect_cause_intent(user_input):
+    # Detects queries seeking explanations for water stress or depletion
+    for k in CAUSE_KEYWORDS:
+        if re.search(rf"\b{k}\b", user_input, re.IGNORECASE):
+            return True
+    return False
+
 def detect_map_request(user_input):
     map_keywords = ["map", "show map", "india map", "visualize on map"]
     return any(k in user_input for k in map_keywords)
@@ -612,12 +635,13 @@ async def ask_bot(item: WaterQuery, request: Request):
         best_match = results[0]["name"]
         match_key = best_match.lower()
 
-        # --- A. CHECK FOR "WHY" INTENT FIRST ---
-        # This ensures "Why is Punjab stressed?" doesn't just return a data table.
-        if "why" in user_input and match_key in WHY_MAP:
-            img_url = await run_in_threadpool(get_image_url, f"{best_match} groundwater depth map district wise") if is_map_requested else None
+        # --- A. CHECK FOR "WHY" / CAUSE INTENT FIRST ---
+        # Ensures "Why is Punjab stressed?" returns an explanation, not just data.
+        if detect_cause_intent(user_input):
+            cause_text = WHY_MAP.get(match_key, "Groundwater stress in this region is typically driven by high agricultural demand (especially for water-intensive crops like paddy or sugarcane), industrial usage, and rapid urbanization that reduces natural recharge.")
+            img_url = await run_in_threadpool(get_image_url, f"{best_match} groundwater stress") if is_map_requested else None
             return {
-                "text": f"### Why is **{best_match.title()}** stressed?\n\n{WHY_MAP[match_key]}",
+                "text": f"### Why is **{best_match.title()}** stressed?\n\n{cause_text}",
                 "chartData": [],
                 "visualType": "action_panel",
                 "visualData": get_visual_data("action_panel", None),
@@ -626,18 +650,7 @@ async def ask_bot(item: WaterQuery, request: Request):
                 "suggestions": get_suggestions(user_input)
             }
 
-        # --- B. CHECK KNOWLEDGE BASE (Definitions) ---
-        if match_key in KNOWLEDGE_BASE:
-            img_url = await run_in_threadpool(get_image_url, best_match) if is_map_requested else None
-            layered_text = format_layered_response(best_match, KNOWLEDGE_BASE[match_key])
-            return {
-                "text": f"### {best_match.title()}\n\n{layered_text}",
-                "chartData": [],
-                "imageUrl": img_url,
-                "suggestions": get_suggestions(user_input)
-            }
-
-        # --- C. CHECK CONSERVATION TIPS ---
+        # --- B. CHECK CONSERVATION TIPS ---
         if match_key in TIPS:
             img_url = await run_in_threadpool(get_image_url, best_match) if is_map_requested else None
             return {
@@ -645,6 +658,41 @@ async def ask_bot(item: WaterQuery, request: Request):
                 "chartData": [],
                 "visualType": "action_panel",
                 "visualData": get_visual_data("action_panel", None),
+                "imageUrl": img_url,
+                "suggestions": get_suggestions(user_input)
+            }
+
+        # --- C. CHECK FOR ACTION/SOLUTION INTENT ---
+        if detect_action_intent(user_input):
+            action_data = get_visual_data("action_panel", None)
+            household = "\n".join([f"• {a}" for a in action_data["householdActions"]])
+            farming = "\n".join([f"• {a}" for a in action_data["farmingActions"]])
+
+            text = (
+                f"### Practical Solutions for **{best_match.title()}**\n\n"
+                f"To reduce groundwater extraction and improve sustainability, consider these practical steps:\n\n"
+                f"**For Households:**\n{household}\n\n"
+                f"**For Farming:**\n{farming}\n\n"
+                f"**For the Community:**\nCheck dams, percolation tanks, and participating in local Water User Associations are highly effective."
+            )
+
+            img_url = await run_in_threadpool(get_image_url, f"{best_match} water conservation") if is_map_requested else None
+            return {
+                "text": text,
+                "chartData": [],
+                "visualType": "action_panel",
+                "visualData": action_data,
+                "imageUrl": img_url,
+                "suggestions": get_suggestions(user_input)
+            }
+
+        # --- D. CHECK KNOWLEDGE BASE (Definitions) ---
+        if match_key in KNOWLEDGE_BASE:
+            img_url = await run_in_threadpool(get_image_url, best_match) if is_map_requested else None
+            layered_text = format_layered_response(best_match, KNOWLEDGE_BASE[match_key])
+            return {
+                "text": f"### {best_match.title()}\n\n{layered_text}",
+                "chartData": [],
                 "imageUrl": img_url,
                 "suggestions": get_suggestions(user_input)
             }
