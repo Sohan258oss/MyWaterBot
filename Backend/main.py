@@ -476,10 +476,81 @@ def get_suggestions(user_input, found_data=None):
             seen.add(s.lower())
     return unique[:3]
 
+# -------------------- VISUAL UTILS --------------------
+def detect_map_request(user_input):
+    map_keywords = ["map", "show map", "india map", "visualize on map"]
+    return any(k in user_input for k in map_keywords)
+
+def get_visual_data(visual_type, data, context=None):
+    if visual_type == "status_card":
+        # data is a single location dict: {"name": "...", "extraction": ...}
+        name = data["name"]
+        val = data["extraction"]
+        category = "Safe"
+        if val > 100: category = "Over-exploited"
+        elif val > 70: category = "Stressed"
+
+        name_lower = name.lower()
+        return {
+            "name": name.title(),
+            "extraction": val,
+            "category": category,
+            "trend": "Stable",
+            "mainCause": WHY_MAP.get(name_lower, "Intensive agricultural and domestic usage."),
+            "topRisk": f"{CONTAMINANT_DATA[name_lower][0]} contamination" if name_lower in CONTAMINANT_DATA else "Water table decline",
+            "recommendedAction": "Implement rainwater harvesting and switch to drip irrigation." if val > 70 else "Maintain sustainable usage and monitor levels."
+        }
+
+    elif visual_type == "comparison_bars":
+        # data is a list of location dicts
+        res = []
+        for d in data:
+            val = d["extraction"]
+            cat = "Safe"
+            if val > 100: cat = "Over-exploited"
+            elif val > 70: cat = "Stressed"
+            res.append({
+                "name": d["name"].title(),
+                "extraction": val,
+                "category": cat
+            })
+        # Sort by extraction descending
+        return sorted(res, key=lambda x: x["extraction"], reverse=True)
+
+    elif visual_type == "risk_alert":
+        # data is a list of contaminants
+        return {
+            "contaminantList": data,
+            "healthRisk": f"Long-term exposure to {', '.join(data)} can cause serious health issues like fluorosis or arsenicosis.",
+            "safeForDrinking": False,
+            "suggestedMitigation": "Use RO filtration, activated alumina for fluoride removal, or seek alternative safe water sources."
+        }
+
+    elif visual_type == "action_panel":
+        return {
+            "householdActions": [
+                "Install low-flow fixtures and dual-flush toilets.",
+                "Harvest rooftop rainwater for non-potable use.",
+                "Fix all leaks in pipes and faucets immediately."
+            ],
+            "farmingActions": [
+                "Switch to drip or sprinkler irrigation systems.",
+                "Grow climate-resilient crops like millets and pulses.",
+                "Use organic mulching to retain soil moisture."
+            ],
+            "communityActions": [
+                "Construct check dams and percolation tanks.",
+                "Participate in local Water User Associations.",
+                "Protect and restore local traditional water bodies."
+            ]
+        }
+    return None
+
 # -------------------- MAIN API --------------------
 @app.post("/ask")
 async def ask_bot(item: WaterQuery, request: Request):
     user_input = item.message.strip().lower()
+    is_map_requested = detect_map_request(user_input)
 
     # Normalize terms
     if "overexploited" in user_input or "over exploited" in user_input:
@@ -495,10 +566,14 @@ async def ask_bot(item: WaterQuery, request: Request):
         if last_data_cache["data"]:
             data = last_data_cache["data"]
             explanation = generate_data_explanation(data)
+            v_type = "comparison_bars" if len(data) > 1 else "status_card"
+            v_data = get_visual_data(v_type, data if len(data) > 1 else data[0])
             last_data_cache["data"] = []
             return {
                 "text": f"Here’s a visual breakdown of the data:\n\n{explanation}",
                 "chartData": data,
+                "visualType": v_type,
+                "visualData": v_data,
                 "suggestions": get_suggestions(user_input, data)
             }
         return {
@@ -540,19 +615,20 @@ async def ask_bot(item: WaterQuery, request: Request):
         # --- A. CHECK FOR "WHY" INTENT FIRST ---
         # This ensures "Why is Punjab stressed?" doesn't just return a data table.
         if "why" in user_input and match_key in WHY_MAP:
-            # Refined query for state-specific depth maps
-            img_url = await run_in_threadpool(get_image_url, f"{best_match} groundwater depth map district wise")
+            img_url = await run_in_threadpool(get_image_url, f"{best_match} groundwater depth map district wise") if is_map_requested else None
             return {
                 "text": f"### Why is **{best_match.title()}** stressed?\n\n{WHY_MAP[match_key]}",
                 "chartData": [],
+                "visualType": "action_panel",
+                "visualData": get_visual_data("action_panel", None),
                 "imageUrl": img_url,
-                "showLegend": True,
+                "showLegend": True if img_url else False,
                 "suggestions": get_suggestions(user_input)
             }
 
         # --- B. CHECK KNOWLEDGE BASE (Definitions) ---
         if match_key in KNOWLEDGE_BASE:
-            img_url = await run_in_threadpool(get_image_url, best_match)
+            img_url = await run_in_threadpool(get_image_url, best_match) if is_map_requested else None
             layered_text = format_layered_response(best_match, KNOWLEDGE_BASE[match_key])
             return {
                 "text": f"### {best_match.title()}\n\n{layered_text}",
@@ -563,10 +639,12 @@ async def ask_bot(item: WaterQuery, request: Request):
 
         # --- C. CHECK CONSERVATION TIPS ---
         if match_key in TIPS:
-            img_url = await run_in_threadpool(get_image_url, best_match)
+            img_url = await run_in_threadpool(get_image_url, best_match) if is_map_requested else None
             return {
                 "text": f"### {best_match.title()} Tip\n\n{TIPS[match_key]}",
                 "chartData": [],
+                "visualType": "action_panel",
+                "visualData": get_visual_data("action_panel", None),
                 "imageUrl": img_url,
                 "suggestions": get_suggestions(user_input)
             }
@@ -639,20 +717,31 @@ async def ask_bot(item: WaterQuery, request: Request):
                 intro = "Groundwater extraction measures usage relative to natural recharge.\n\n" if is_usage_query else ""
 
                 # Fetch image for the locations found
-                if len(found_data) > 1:
-                    # Comparison query for multiple states/districts
-                    names = [d['name'] for d in found_data]
-                    img_query = f"{' and '.join(names[:2])} groundwater depth comparison map"
-                else:
-                    img_query = f"{found_data[0]['name']} groundwater depth map district wise"
+                img_url = None
+                if is_map_requested:
+                    if len(found_data) > 1:
+                        # Comparison query for multiple states/districts
+                        names = [d['name'] for d in found_data]
+                        img_query = f"{' and '.join(names[:2])} groundwater depth comparison map"
+                    else:
+                        img_query = f"{found_data[0]['name']} groundwater depth map district wise"
+                    img_url = await run_in_threadpool(get_image_url, img_query)
 
-                img_url = await run_in_threadpool(get_image_url, img_query)
+                v_type = "comparison_bars" if len(found_data) > 1 else "status_card"
+                v_data = get_visual_data(v_type, found_data if len(found_data) > 1 else found_data[0])
+
+                # Override with risk_alert if it's a single location and has contaminants
+                if len(found_data) == 1 and found_data[0]["name"].lower() in CONTAMINANT_DATA:
+                    v_type = "risk_alert"
+                    v_data = get_visual_data("risk_alert", CONTAMINANT_DATA[found_data[0]["name"].lower()])
 
                 return {
                     "text": f"{intro}{full_response}\n\nWould you like a chart? (Yes/No)",
                     "chartData": [],
+                    "visualType": v_type,
+                    "visualData": v_data,
                     "imageUrl": img_url,
-                    "showLegend": True,
+                    "showLegend": True if img_url else False,
                     "suggestions": get_suggestions(user_input, found_data)
                 }
 
@@ -661,10 +750,12 @@ async def ask_bot(item: WaterQuery, request: Request):
 
         # Fallback for WHY_MAP if "why" wasn't in query but it's the best match and not a location
         if match_key in WHY_MAP:
-            img_url = await run_in_threadpool(get_image_url, f"{best_match} groundwater stress")
+            img_url = await run_in_threadpool(get_image_url, f"{best_match} groundwater stress") if is_map_requested else None
             return {
                 "text": f"### Why is **{best_match.title()}** stressed?\n\n{WHY_MAP[match_key]}",
                 "chartData": [],
+                "visualType": "action_panel",
+                "visualData": get_visual_data("action_panel", None),
                 "imageUrl": img_url,
                 "suggestions": get_suggestions(user_input)
             }

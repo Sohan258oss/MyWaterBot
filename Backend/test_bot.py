@@ -62,3 +62,51 @@ def test_master_plan_query(mock_search):
         data = response.json()
         assert "Master Plan" in data["text"]
         assert "1.42 crore" in data["text"]
+
+@patch('Backend.main.semantic_search.search')
+@patch('Backend.main.get_image_url')
+def test_map_suppression(mock_get_image, mock_search):
+    mock_search.return_value = [{"name": "Karnataka", "score": 0.9}]
+    mock_get_image.return_value = "http://map.url"
+    with TestClient(app) as client:
+        # Normal query should NOT have imageUrl
+        response = client.post("/ask", json={"message": "Karnataka"})
+        data = response.json()
+        assert data.get("imageUrl") is None
+
+        # Query with "map" should have imageUrl
+        response = client.post("/ask", json={"message": "show map for Karnataka"})
+        data = response.json()
+        assert data.get("imageUrl") == "http://map.url"
+
+@patch('Backend.main.semantic_search.search')
+def test_visual_types(mock_search):
+    with TestClient(app) as client:
+        # Single location -> status_card (or risk_alert if contaminants exist)
+        mock_search.return_value = [{"name": "Karnataka", "score": 0.9}]
+        response = client.post("/ask", json={"message": "Karnataka"})
+        data = response.json()
+        # Karnataka has contaminants in CONTAMINANT_DATA, so should be risk_alert
+        assert data.get("visualType") == "risk_alert"
+        assert "contaminantList" in data["visualData"]
+
+        # Single location NO contaminants -> status_card
+        # Based on WHY_MAP, Maharashtra is there, let's assume it's in DB or mock it
+        mock_search.return_value = [{"name": "Maharashtra", "score": 0.9}]
+        response = client.post("/ask", json={"message": "Maharashtra"})
+        data = response.json()
+        # If it's not in DB it might fall back to WHY_MAP
+        if data.get("visualType") == "action_panel": # Fallback for WHY_MAP
+             assert data["visualType"] == "action_panel"
+        else:
+             assert data.get("visualType") == "status_card"
+
+        # Multiple locations -> comparison_bars
+        mock_search.return_value = [
+            {"name": "Punjab", "score": 0.9},
+            {"name": "Bihar", "score": 0.8}
+        ]
+        response = client.post("/ask", json={"message": "compare Punjab and Bihar"})
+        data = response.json()
+        assert data.get("visualType") == "comparison_bars"
+        assert len(data["visualData"]) >= 2

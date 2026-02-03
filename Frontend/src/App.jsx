@@ -95,6 +95,8 @@ export default function App() {
           type: "bot",
           text: data.text,
           chartData: data.chartData || [],
+          visualType: data.visualType || null,
+          visualData: data.visualData || null,
           imageUrl: data.imageUrl || null,
           showLegend: data.showLegend || false,
           suggestions: data.suggestions || []
@@ -205,6 +207,102 @@ export default function App() {
                         <MapLegend />
                       </div>
                     )}
+                  </div>
+                )}
+
+                {m.visualType === "status_card" && m.visualData && (
+                  <div className="status-card">
+                    <div className="status-header">
+                      <h3>{m.visualData.name}</h3>
+                      <span className={`category-badge ${m.visualData.category.toLowerCase().replace(" ", "-")}`}>
+                        {m.visualData.category}
+                      </span>
+                    </div>
+                    <div className="status-grid">
+                      <div className="status-item">
+                        <label>Extraction</label>
+                        <span>{m.visualData.extraction}%</span>
+                      </div>
+                      <div className="status-item">
+                        <label>Trend</label>
+                        <span>{m.visualData.trend}</span>
+                      </div>
+                    </div>
+                    <div className="status-info">
+                      <p><strong>Cause:</strong> {m.visualData.mainCause}</p>
+                      <p><strong>Risk:</strong> {m.visualData.topRisk}</p>
+                    </div>
+                    <div className="status-action">
+                      <strong>Recommended Action:</strong> {m.visualData.recommendedAction}
+                    </div>
+                  </div>
+                )}
+
+                {m.visualType === "comparison_bars" && m.visualData && (
+                  <div className="comparison-container">
+                    <h3>Regional Comparison</h3>
+                    <div className="comparison-bars-list">
+                      {m.visualData.map((d, di) => (
+                        <div key={di} className="comparison-bar-row">
+                          <div className="bar-label">{d.name}</div>
+                          <div className="bar-wrapper">
+                            <div
+                              className={`bar-fill ${d.category.toLowerCase().replace(" ", "-")}`}
+                              style={{ width: `${Math.min(d.extraction, 100)}%` }}
+                            ></div>
+                            <span className="bar-value">{d.extraction}%</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {m.visualType === "risk_alert" && m.visualData && (
+                  <div className="risk-alert-card">
+                    <div className="alert-header">
+                      <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                      </svg>
+                      <h4>Water Quality Alert</h4>
+                    </div>
+                    <div className="alert-content">
+                      <p><strong>Contaminants:</strong> {m.visualData.contaminantList.join(", ")}</p>
+                      <p>{m.visualData.healthRisk}</p>
+                    </div>
+                    <div className="alert-footer">
+                      <strong>Suggested Mitigation:</strong> {m.visualData.suggestedMitigation}
+                    </div>
+                  </div>
+                )}
+
+                {m.visualType === "action_panel" && m.visualData && (
+                  <div className="action-panel">
+                    <h3>Recommended Actions</h3>
+                    <div className="action-sections">
+                      <div className="action-section">
+                        <h4>Household</h4>
+                        <ul>
+                          {m.visualData.householdActions.map((act, ai) => <li key={ai}>{act}</li>)}
+                        </ul>
+                      </div>
+                      {m.visualData.farmingActions && (
+                        <div className="action-section">
+                          <h4>Farming</h4>
+                          <ul>
+                            {m.visualData.farmingActions.map((act, ai) => <li key={ai}>{act}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                      <div className="action-section">
+                        <h4>Community</h4>
+                        <ul>
+                          {m.visualData.communityActions.map((act, ai) => <li key={ai}>{act}</li>)}
+                        </ul>
+                      </div>
+                    </div>
                   </div>
                 )}
 
