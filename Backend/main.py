@@ -155,7 +155,7 @@ app = FastAPI(lifespan=lifespan)
 # -------------------- SMART GENAI LAYER --------------------
 async def get_smart_response(user_query: str, context: str):
     """
-    Generates a natural language explanation using Mistral-7B via HF Inference API.
+    Generates a natural language explanation using Llama 3 via HF Inference API.
     Only uses verified context provided by the rule-based/DB logic.
     """
     client = AsyncInferenceClient(
@@ -183,7 +183,7 @@ async def get_smart_response(user_query: str, context: str):
         # chat_completion yields chunks incrementally if stream=True
         # This aligns with the 'conversational' task required by some providers
         stream = await client.chat_completion(
-            model="mistralai/Mistral-7B-Instruct-v0.2",
+            model="meta-llama/Meta-Llama-3-8B-Instruct",
             messages=messages,
             stream=True,
             max_tokens=500
