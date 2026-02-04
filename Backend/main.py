@@ -26,7 +26,6 @@ class SemanticSearch:
             cls._instance.hf_token = os.getenv("HF_TOKEN")
             cls._instance.client = InferenceClient(
                 token=cls._instance.hf_token,
-                base_url="https://router.huggingface.co/hf-inference",
                 headers={"X-Wait-For-Model": "true"}
             )
             cls._instance.entities = []
@@ -160,44 +159,35 @@ async def get_smart_response(user_query: str, context: str):
     Only uses verified context provided by the rule-based/DB logic.
     """
     client = AsyncInferenceClient(
-        token=os.getenv("HF_TOKEN"),
-        base_url="https://router.huggingface.co/hf-inference"
+        token=os.getenv("HF_TOKEN")
     )
 
-    # Strictly follow the requested persona and prompt format using Chat Messages
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are an expert groundwater assistant for India.\n"
-                "An expert in:\n"
-                "- Indian groundwater systems\n"
-                "- CGWB classifications\n"
-                "- Aquifers, contamination, recharge\n"
-                "- Water policy and sustainability\n"
-                "Strictly use only the provided context.\n"
-                "Never invent statistics or causes.\n"
-                "Do not hallucinate or assume missing data."
-            )
-        },
-        {
-            "role": "user",
-            "content": f"USER QUESTION:\n{user_query}\n\nVERIFIED CONTEXT:\n{context}"
-        }
-    ]
+    system_prompt = (
+        "You are an expert groundwater assistant for India.\n"
+        "An expert in:\n"
+        "- Indian groundwater systems\n"
+        "- CGWB classifications\n"
+        "- Aquifers, contamination, recharge\n"
+        "- Water policy and sustainability\n"
+        "Strictly use only the provided context.\n"
+        "Never invent statistics or causes.\n"
+        "Do not hallucinate or assume missing data."
+    )
+
+    # Mistral-7B-Instruct-v0.3 template
+    prompt = f"<s>[INST] {system_prompt}\n\nUSER QUESTION:\n{user_query}\n\nVERIFIED CONTEXT:\n{context} [/INST]"
 
     try:
-        # stream=True yields tokens incrementally
-        stream = await client.chat_completion(
-            model="mistralai/Mistral-7B-Instruct-v0.2",
-            messages=messages,
+        # text_generation yields tokens incrementally if stream=True
+        # We must await the call as it returns an async iterator
+        stream = await client.text_generation(
+            model="mistralai/Mistral-7B-Instruct-v0.3",
+            prompt=prompt,
             stream=True,
-            max_tokens=500
+            max_new_tokens=500
         )
-        async for chunk in stream:
-            token = chunk.choices[0].delta.content
-            if token:
-                yield token
+        async for token in stream:
+            yield token
     except Exception as e:
         print(f"GenAI Error: {e}")
         # When an error occurs, the generator simply stops.
