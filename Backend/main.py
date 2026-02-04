@@ -14,6 +14,13 @@ from bs4 import BeautifulSoup
 from fastapi.middleware.cors import CORSMiddleware
 from duckduckgo_search import DDGS
 
+# -------------------- GLOBAL GENAI CLIENT --------------------
+GENAI_CLIENT = AsyncInferenceClient(
+    token=os.getenv("HF_TOKEN"),
+    timeout=60
+)
+
+
 # -------------------- CORRECTED SEMANTIC SEARCH --------------------
 class SemanticSearch:
     _instance = None
@@ -158,9 +165,8 @@ async def get_smart_response(user_query: str, context: str):
     Generates a natural language explanation using Llama 3 via HF Inference API.
     Only uses verified context provided by the rule-based/DB logic.
     """
-    client = AsyncInferenceClient(
-        token=os.getenv("HF_TOKEN")
-    )
+    client = GENAI_CLIENT
+    context = context[:3500]
 
     system_prompt = (
         "You are an expert groundwater assistant for India.\n"
@@ -182,16 +188,28 @@ async def get_smart_response(user_query: str, context: str):
     try:
         # chat_completion yields chunks incrementally if stream=True
         # This aligns with the 'conversational' task required by some providers
-        stream = await client.chat_completion(
+        stream = client.chat_completion(
             model="meta-llama/Meta-Llama-3-8B-Instruct",
             messages=messages,
             stream=True,
-            max_tokens=500
+            max_tokens=300
         )
         async for chunk in stream:
-            token = chunk.choices[0].delta.content
-            if token:
-                yield token
+            # ---- SAFETY GUARDS (CRITICAL) ----
+            if not hasattr(chunk, "choices") or not chunk.choices:
+                continue
+
+            choice = chunk.choices[0]
+            if not hasattr(choice, "delta") or not choice.delta:
+                continue
+
+            token = getattr(choice.delta, "content", None)
+            if not token:
+                continue
+
+            safe = token.replace("\n", " ")
+            if safe.strip():
+                yield safe
     except Exception as e:
         print(f"GenAI Error: {e}")
         # When an error occurs, the generator simply stops.
