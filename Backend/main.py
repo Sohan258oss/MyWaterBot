@@ -164,36 +164,40 @@ async def get_smart_response(user_query: str, context: str):
         base_url="https://router.huggingface.co/hf-inference"
     )
 
-    # Strictly follow the requested persona and prompt format
-    prompt = f"""SYSTEM:
-You are an expert groundwater assistant for India.
-An expert in:
-- Indian groundwater systems
-- CGWB classifications
-- Aquifers, contamination, recharge
-- Water policy and sustainability
-Strictly use only the provided context.
-Never invent statistics or causes.
-Do not hallucinate or assume missing data.
-
-USER QUESTION:
-{user_query}
-
-VERIFIED CONTEXT:
-{context}
-
-ANSWER:"""
+    # Strictly follow the requested persona and prompt format using Chat Messages
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are an expert groundwater assistant for India.\n"
+                "An expert in:\n"
+                "- Indian groundwater systems\n"
+                "- CGWB classifications\n"
+                "- Aquifers, contamination, recharge\n"
+                "- Water policy and sustainability\n"
+                "Strictly use only the provided context.\n"
+                "Never invent statistics or causes.\n"
+                "Do not hallucinate or assume missing data."
+            )
+        },
+        {
+            "role": "user",
+            "content": f"USER QUESTION:\n{user_query}\n\nVERIFIED CONTEXT:\n{context}"
+        }
+    ]
 
     try:
         # stream=True yields tokens incrementally
-        stream = await client.text_generation(
+        stream = await client.chat_completion(
             model="mistralai/Mistral-7B-Instruct-v0.2",
-            prompt=prompt,
+            messages=messages,
             stream=True,
-            max_new_tokens=500
+            max_tokens=500
         )
-        async for token in stream:
-            yield token
+        async for chunk in stream:
+            token = chunk.choices[0].delta.content
+            if token:
+                yield token
     except Exception as e:
         print(f"GenAI Error: {e}")
         # When an error occurs, the generator simply stops.
