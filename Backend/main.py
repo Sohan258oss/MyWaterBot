@@ -564,6 +564,7 @@ def get_suggestions(user_input, found_data=None):
 # -------------------- VISUAL UTILS --------------------
 ACTION_KEYWORDS = ["reduce", "how to", "solution", "steps", "ways", "minimize", "conserve", "prevent", "action", "improvement", "management", "reduction", "curb", "save"]
 CAUSE_KEYWORDS = ["why", "cause", "reason", "factor", "trigger", "drivers", "stressed"]
+TREND_KEYWORDS = ["trend", "over time", "changed", "worse", "better", "history", "years", "past"]
 
 def detect_action_intent(user_input):
     # Check for multi-word phrases first
@@ -580,6 +581,12 @@ def detect_action_intent(user_input):
 def detect_cause_intent(user_input):
     # Detects queries seeking explanations for water stress or depletion
     for k in CAUSE_KEYWORDS:
+        if re.search(rf"\b{k}\b", user_input, re.IGNORECASE):
+            return True
+    return False
+
+def detect_trend_intent(user_input):
+    for k in TREND_KEYWORDS:
         if re.search(rf"\b{k}\b", user_input, re.IGNORECASE):
             return True
     return False
@@ -699,7 +706,53 @@ async def get_rule_based_response(user_input: str, request: Request):
         best_match = results[0]["name"]
         match_key = best_match.lower()
 
-        # --- A. CHECK FOR "WHY" / CAUSE INTENT FIRST ---
+        # --- A. CHECK FOR TREND INTENT ---
+        if detect_trend_intent(user_input):
+            trend_data = None
+            try:
+                with sqlite3.connect(DB_PATH) as conn:
+                    conn.row_factory = sqlite3.Row
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT * FROM state_trends WHERE state = ?", (match_key,))
+                    row = cursor.fetchone()
+                    if row:
+                        trend_data = dict(row)
+            except Exception as e:
+                print(f"Trend DB error: {e}")
+
+            if trend_data:
+                years = [k for k in trend_data.keys() if k.isdigit()]
+                years.sort()
+                values = [trend_data[y] for y in years]
+
+                # Diagnostic logic
+                first_val = values[0]
+                last_val = values[-1]
+                diff = last_val - first_val
+                if abs(diff) < 2:
+                    diagnostic = "stable"
+                    explanation = f"Groundwater extraction in {best_match.title()} has remained **stable** over the last few years."
+                elif diff > 0:
+                    diagnostic = "worsening"
+                    explanation = f"Groundwater extraction in {best_match.title()} is **worsening**, increasing from {first_val}% to {last_val}%."
+                else:
+                    diagnostic = "improving"
+                    explanation = f"Groundwater extraction in {best_match.title()} is **improving**, decreasing from {first_val}% to {last_val}%."
+
+                return {
+                    "text": f"### Trend Analysis for {best_match.title()}\n\n{explanation}\n\nBased on CGWB assessment data, here is how the extraction percentage has changed over time.",
+                    "chartData": [],
+                    "visualType": "trend_line",
+                    "visualData": {
+                        "name": best_match.title(),
+                        "labels": years,
+                        "values": values,
+                        "diagnostic": diagnostic
+                    },
+                    "suggestions": get_suggestions(user_input)
+                }
+
+        # --- B. CHECK FOR "WHY" / CAUSE INTENT ---
         # Ensures "Why is Punjab stressed?" returns an explanation, not just data.
         if detect_cause_intent(user_input):
             cause_text = WHY_MAP.get(match_key, "Groundwater stress in this region is typically driven by high agricultural demand (especially for water-intensive crops like paddy or sugarcane), industrial usage, and rapid urbanization that reduces natural recharge.")

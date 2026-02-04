@@ -921,3 +921,34 @@ button:not(.send-btn):active {
   padding-top: 10px;
 }
 
+
+/* Trend Card */
+.trend-card h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+  color: #011627;
+}
+.trend-diagnostic {
+  margin-top: 15px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-align: center;
+  font-size: 0.9rem;
+}
+.trend-diagnostic.improving {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #c8e6c9;
+}
+.trend-diagnostic.worsening {
+  background: #ffebee;
+  color: #c62828;
+  border: 1px solid #ffcdd2;
+}
+.trend-diagnostic.stable {
+  background: #f0f8ff;
+  color: #011627;
+  border: 1px solid #d1e9ff;
+}

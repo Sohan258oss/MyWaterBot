@@ -109,3 +109,16 @@ def test_visual_types(mock_search):
         data = response.json()
         assert data.get("visualType") == "comparison_bars"
         assert len(data["visualData"]) >= 2
+
+@patch('Backend.main.semantic_search.search')
+def test_trend_query(mock_search):
+    mock_search.return_value = [{"name": "Punjab", "score": 0.9}]
+    with TestClient(app) as client:
+        # Query for trend
+        response = client.post("/ask", json={"message": "show trend for Punjab"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data.get("visualType") == "trend_line"
+        assert "labels" in data["visualData"]
+        assert "values" in data["visualData"]
+        assert "diagnostic" in data["visualData"]

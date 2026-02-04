@@ -2,18 +2,20 @@ import { useState, useRef, useEffect } from "react";
 import GroundwaterMap from "./GroundwaterMap";
 import WebGLWaves from "./components/WebGLWaves";
 import MapLegend from "./components/MapLegend";
-import { Bar } from "react-chartjs-2";
+import { Bar, Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   BarElement,
+  PointElement,
+  LineElement,
   Tooltip,
   Legend
 } from "chart.js";
 import "./App.css";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend);
 
 export default function App() {
   const [input, setInput] = useState("");
@@ -321,6 +323,45 @@ export default function App() {
                     </div>
                     <div className="alert-footer">
                       <strong>Suggested Mitigation:</strong> {m.visualData.suggestedMitigation}
+                    </div>
+                  </div>
+                )}
+
+                {m.visualType === "trend_line" && m.visualData && (
+                  <div className="chart-card trend-card">
+                    <h3>{m.visualData.name} Extraction Trend</h3>
+                    <div className="chart-container">
+                      <Line
+                        data={{
+                          labels: m.visualData.labels,
+                          datasets: [{
+                            label: "Extraction (%)",
+                            data: m.visualData.values,
+                            fill: false,
+                            borderColor: "#011627",
+                            backgroundColor: "#011627",
+                            tension: 0.3,
+                            pointRadius: 6,
+                            pointHoverRadius: 8
+                          }]
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: { display: false }
+                          },
+                          scales: {
+                            y: {
+                              beginAtZero: false,
+                              ticks: { callback: (val) => `${val}%` }
+                            }
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className={`trend-diagnostic ${m.visualData.diagnostic}`}>
+                      Status: {m.visualData.diagnostic.charAt(0).toUpperCase() + m.visualData.diagnostic.slice(1)}
                     </div>
                   </div>
                 )}
