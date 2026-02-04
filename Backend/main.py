@@ -174,20 +174,24 @@ async def get_smart_response(user_query: str, context: str):
         "Do not hallucinate or assume missing data."
     )
 
-    # Mistral-7B-Instruct-v0.3 template
-    prompt = f"<s>[INST] {system_prompt}\n\nUSER QUESTION:\n{user_query}\n\nVERIFIED CONTEXT:\n{context} [/INST]"
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"USER QUESTION:\n{user_query}\n\nVERIFIED CONTEXT:\n{context}"}
+    ]
 
     try:
-        # text_generation yields tokens incrementally if stream=True
-        # We must await the call as it returns an async iterator
-        stream = await client.text_generation(
+        # chat_completion yields chunks incrementally if stream=True
+        # This aligns with the 'conversational' task required by some providers
+        stream = await client.chat_completion(
             model="mistralai/Mistral-7B-Instruct-v0.3",
-            prompt=prompt,
+            messages=messages,
             stream=True,
-            max_new_tokens=500
+            max_tokens=500
         )
-        async for token in stream:
-            yield token
+        async for chunk in stream:
+            token = chunk.choices[0].delta.content
+            if token:
+                yield token
     except Exception as e:
         print(f"GenAI Error: {e}")
         # When an error occurs, the generator simply stops.
