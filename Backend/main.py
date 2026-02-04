@@ -176,7 +176,7 @@ async def get_smart_response(user_query: str, context: str):
         "If extraction > 100%, use a concerned but professional tone.\n"
         "Use Indian terminology (e.g., 'Taluka', 'Lakh', 'Kharif/Rabi') where appropriate.\n"
         "If contaminants like Arsenic or Fluoride are mentioned, prioritize health warnings.\n"
-        "Keep responses under 200 words unless the user asks for a deep dive.
+        "Keep responses under 200 words unless the user asks for a deep dive."
         "Never invent statistics or causes.\n"
         "Do not hallucinate or assume missing data."
     )
