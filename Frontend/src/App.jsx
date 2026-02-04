@@ -76,32 +76,79 @@ export default function App() {
     setInput("");
     setLoading(true);
 
-    const apiBase = window.location.hostname === "localhost"
+    const apiBase = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
       ? "http://localhost:8000"
       : "https://ingres-api.onrender.com";
 
     try {
-      const res = await fetch(`${apiBase}/ask`, {
+      const response = await fetch(`${apiBase}/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userMsg })
+        body: JSON.stringify({ message: userMsg, stream: true })
       });
 
-      const data = await res.json();
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
 
+      // Initialize bot message
+      const botMessageId = messages.length + 1;
       setMessages((m) => [
         ...m,
         {
           type: "bot",
-          text: data.text,
-          chartData: data.chartData || [],
-          visualType: data.visualType || null,
-          visualData: data.visualData || null,
-          imageUrl: data.imageUrl || null,
-          showLegend: data.showLegend || false,
-          suggestions: data.suggestions || []
+          text: "",
+          chartData: [],
+          visualType: null,
+          visualData: null,
+          imageUrl: null,
+          showLegend: false,
+          suggestions: []
         }
       ]);
+
+      let accumulatedText = "";
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop();
+
+        for (const part of parts) {
+          if (!part.startsWith("data: ")) continue;
+
+          const jsonStr = part.substring(6);
+          try {
+            const data = JSON.parse(jsonStr);
+
+            if (data.t) {
+              accumulatedText += data.t;
+              setMessages((m) => {
+                const newMessages = [...m];
+                newMessages[newMessages.length - 1].text = accumulatedText;
+                return newMessages;
+              });
+            } else if (data.m) {
+              setMessages((m) => {
+                const newMessages = [...m];
+                const last = newMessages[newMessages.length - 1];
+                last.chartData = data.m.chartData || [];
+                last.visualType = data.m.visualType || null;
+                last.visualData = data.m.visualData || null;
+                last.imageUrl = data.m.imageUrl || null;
+                last.showLegend = data.m.showLegend || false;
+                last.suggestions = data.m.suggestions || [];
+                return newMessages;
+              });
+            }
+          } catch (e) {
+            console.error("Error parsing stream chunk", e, "jsonStr:", jsonStr);
+          }
+        }
+      }
     } catch {
       setMessages((m) => [
         ...m,
@@ -278,33 +325,6 @@ export default function App() {
                   </div>
                 )}
 
-                {m.visualType === "action_panel" && m.visualData && (
-                  <div className="action-panel">
-                    <h3>Recommended Actions</h3>
-                    <div className="action-sections">
-                      <div className="action-section">
-                        <h4>Household</h4>
-                        <ul>
-                          {m.visualData.householdActions.map((act, ai) => <li key={ai}>{act}</li>)}
-                        </ul>
-                      </div>
-                      {m.visualData.farmingActions && (
-                        <div className="action-section">
-                          <h4>Farming</h4>
-                          <ul>
-                            {m.visualData.farmingActions.map((act, ai) => <li key={ai}>{act}</li>)}
-                          </ul>
-                        </div>
-                      )}
-                      <div className="action-section">
-                        <h4>Community</h4>
-                        <ul>
-                          {m.visualData.communityActions.map((act, ai) => <li key={ai}>{act}</li>)}
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {m.type === "bot" && m.suggestions && m.suggestions.length > 0 && (
                   <div className="bot-suggestions">

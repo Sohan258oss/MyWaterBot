@@ -1,4 +1,5 @@
 import os
+import asyncio
 import requests
 import json
 import math
@@ -208,8 +209,9 @@ async def get_smart_response(user_query: str, context: str):
                 continue
 
             safe = token.replace("\n", " ")
-            if safe.strip():
-                yield safe
+            for ch in safe:
+                yield ch
+                await asyncio.sleep(0.015)
     except Exception as e:
         print(f"GenAI Error: {e}")
         # When an error occurs, the generator simply stops.
@@ -613,24 +615,6 @@ def get_visual_data(visual_type, data, context=None):
             "suggestedMitigation": "Use RO filtration, activated alumina for fluoride removal, or seek alternative safe water sources."
         }
 
-    elif visual_type == "action_panel":
-        return {
-            "householdActions": [
-                "Install low-flow fixtures and dual-flush toilets.",
-                "Harvest rooftop rainwater for non-potable use.",
-                "Fix all leaks in pipes and faucets immediately."
-            ],
-            "farmingActions": [
-                "Switch to drip or sprinkler irrigation systems.",
-                "Grow climate-resilient crops like millets and pulses.",
-                "Use organic mulching to retain soil moisture."
-            ],
-            "communityActions": [
-                "Construct check dams and percolation tanks.",
-                "Participate in local Water User Associations.",
-                "Protect and restore local traditional water bodies."
-            ]
-        }
     return None
 
 # -------------------- MAIN API --------------------
@@ -705,8 +689,6 @@ async def get_rule_based_response(user_input: str, request: Request):
             return {
                 "text": f"### Why is **{best_match.title()}** stressed?\n\n{cause_text}",
                 "chartData": [],
-                "visualType": "action_panel",
-                "visualData": get_visual_data("action_panel", None),
                 "imageUrl": img_url,
                 "showLegend": True if img_url else False,
                 "suggestions": get_suggestions(user_input)
@@ -718,32 +700,31 @@ async def get_rule_based_response(user_input: str, request: Request):
             return {
                 "text": f"### {best_match.title()} Tip\n\n{TIPS[match_key]}",
                 "chartData": [],
-                "visualType": "action_panel",
-                "visualData": get_visual_data("action_panel", None),
                 "imageUrl": img_url,
                 "suggestions": get_suggestions(user_input)
             }
 
         # --- C. CHECK FOR ACTION/SOLUTION INTENT ---
         if detect_action_intent(user_input):
-            action_data = get_visual_data("action_panel", None)
-            household = "\n".join([f"• {a}" for a in action_data["householdActions"]])
-            farming = "\n".join([f"• {a}" for a in action_data["farmingActions"]])
-
             text = (
                 f"### Practical Solutions for **{best_match.title()}**\n\n"
                 f"To reduce groundwater extraction and improve sustainability, consider these practical steps:\n\n"
-                f"**For Households:**\n{household}\n\n"
-                f"**For Farming:**\n{farming}\n\n"
-                f"**For the Community:**\nCheck dams, percolation tanks, and participating in local Water User Associations are highly effective."
+                f"**For Households:**\n"
+                f"• Install low-flow fixtures and dual-flush toilets.\n"
+                f"• Harvest rooftop rainwater for non-potable use.\n"
+                f"• Fix all leaks in pipes and faucets immediately.\n\n"
+                f"**For Farming:**\n"
+                f"• Switch to drip or sprinkler irrigation systems.\n"
+                f"• Grow climate-resilient crops like millets and pulses.\n"
+                f"• Use organic mulching to retain soil moisture.\n\n"
+                f"**For the Community:**\n"
+                f"Check dams, percolation tanks, and participating in local Water User Associations are highly effective."
             )
 
             img_url = await run_in_threadpool(get_image_url, f"{best_match} water conservation") if is_map_requested else None
             return {
                 "text": text,
                 "chartData": [],
-                "visualType": "action_panel",
-                "visualData": action_data,
                 "imageUrl": img_url,
                 "suggestions": get_suggestions(user_input)
             }
@@ -864,8 +845,6 @@ async def get_rule_based_response(user_input: str, request: Request):
             return {
                 "text": f"### Why is **{best_match.title()}** stressed?\n\n{WHY_MAP[match_key]}",
                 "chartData": [],
-                "visualType": "action_panel",
-                "visualData": get_visual_data("action_panel", None),
                 "imageUrl": img_url,
                 "suggestions": get_suggestions(user_input)
             }
@@ -892,17 +871,18 @@ async def ask_bot(item: WaterQuery, request: Request):
             full_text = ""
             try:
                 # 2. Get smart response from LLM
-                async for token in get_smart_response(item.message, context):
-                    full_text += token
-                    yield f"data: {token}\n\n"
+                async for ch in get_smart_response(item.message, context):
+                    full_text += ch
+                    yield f"data: {json.dumps({'t': ch})}\n\n"
             except Exception as e:
                 print(f"Streaming error: {e}")
 
             # 3. Reliability & Fallback
             if not full_text:
-                # If LLM failed, yield base response text in chunks
-                for chunk in context.split(" "):
-                    yield f"data: {chunk} \n\n"
+                # If LLM failed, yield base response text in characters
+                for ch in context:
+                    yield f"data: {json.dumps({'t': ch})}\n\n"
+                    await asyncio.sleep(0.015)
 
             # 4. Final metadata for visual components
             metadata = {
@@ -913,7 +893,7 @@ async def ask_bot(item: WaterQuery, request: Request):
                 "showLegend": base_response.get("showLegend"),
                 "suggestions": base_response.get("suggestions")
             }
-            yield f"data: {json.dumps(metadata)}\n\n"
+            yield f"data: {json.dumps({'m': metadata})}\n\n"
 
         return StreamingResponse(stream_generator(), media_type="text/event-stream")
 

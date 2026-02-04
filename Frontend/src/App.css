@@ -921,35 +921,3 @@ button:not(.send-btn):active {
   padding-top: 10px;
 }
 
-/* Action Panel */
-.action-panel {
-  background: white;
-  border-radius: 16px;
-  padding: 20px;
-  margin: 15px 0;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  max-width: 600px;
-}
-.action-sections {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 15px;
-}
-@media (min-width: 600px) {
-  .action-sections { grid-template-columns: 1fr 1fr; }
-}
-.action-section h4 {
-  margin-bottom: 10px;
-  color: #011627;
-  border-bottom: 2px solid #f0f8ff;
-  padding-bottom: 4px;
-}
-.action-section ul {
-  padding-left: 20px;
-  margin: 0;
-}
-.action-section li {
-  font-size: 0.85rem;
-  margin-bottom: 5px;
-  color: #444;
-}
