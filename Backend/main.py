@@ -183,7 +183,7 @@ async def get_smart_response(user_query: str, context: str):
         # chat_completion yields chunks incrementally if stream=True
         # This aligns with the 'conversational' task required by some providers
         stream = await client.chat_completion(
-            model="mistralai/Mistral-7B-Instruct-v0.3",
+            model="mistralai/Mistral-7B-Instruct-v0.2",
             messages=messages,
             stream=True,
             max_tokens=500
