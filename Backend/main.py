@@ -4,8 +4,9 @@ import json
 import math
 import sqlite3
 import re
-from huggingface_hub import InferenceClient
+from huggingface_hub import InferenceClient, AsyncInferenceClient
 from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse
 from contextlib import asynccontextmanager
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
@@ -152,6 +153,52 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+# -------------------- SMART GENAI LAYER --------------------
+async def get_smart_response(user_query: str, context: str):
+    """
+    Generates a natural language explanation using Mistral-7B via HF Inference API.
+    Only uses verified context provided by the rule-based/DB logic.
+    """
+    client = AsyncInferenceClient(
+        token=os.getenv("HF_TOKEN"),
+        base_url="https://router.huggingface.co/hf-inference"
+    )
+
+    # Strictly follow the requested persona and prompt format
+    prompt = f"""SYSTEM:
+You are an expert groundwater assistant for India.
+An expert in:
+- Indian groundwater systems
+- CGWB classifications
+- Aquifers, contamination, recharge
+- Water policy and sustainability
+Strictly use only the provided context.
+Never invent statistics or causes.
+Do not hallucinate or assume missing data.
+
+USER QUESTION:
+{user_query}
+
+VERIFIED CONTEXT:
+{context}
+
+ANSWER:"""
+
+    try:
+        # stream=True yields tokens incrementally
+        stream = await client.text_generation(
+            model="mistralai/Mistral-7B-Instruct-v0.2",
+            prompt=prompt,
+            stream=True,
+            max_new_tokens=500
+        )
+        async for token in stream:
+            yield token
+    except Exception as e:
+        print(f"GenAI Error: {e}")
+        # When an error occurs, the generator simply stops.
+        # The caller should handle the fallback if no text was generated.
+
 # -------------------- SERVICES --------------------
 def get_wikipedia_image(query):
     """Fallback to fetch image from Wikipedia if search fails."""
@@ -233,6 +280,7 @@ app.add_middleware(
 
 class WaterQuery(BaseModel):
     message: str
+    stream: bool = False
 
 last_data_cache = {"data": []}
 
@@ -570,9 +618,7 @@ def get_visual_data(visual_type, data, context=None):
     return None
 
 # -------------------- MAIN API --------------------
-@app.post("/ask")
-async def ask_bot(item: WaterQuery, request: Request):
-    user_input = item.message.strip().lower()
+async def get_rule_based_response(user_input: str, request: Request):
     is_map_requested = detect_map_request(user_input)
 
     # Normalize terms
@@ -816,6 +862,60 @@ async def ask_bot(item: WaterQuery, request: Request):
         "chartData": [],
         "suggestions": get_suggestions(user_input)
     }
+
+@app.post("/ask")
+async def ask_bot(item: WaterQuery, request: Request):
+    user_input = item.message.strip().lower()
+
+    # 1. Get verified context and base response from rule-based engine
+    base_response = await get_rule_based_response(user_input, request)
+    context = base_response.get("text", "")
+
+    if item.stream:
+        async def stream_generator():
+            full_text = ""
+            try:
+                # 2. Get smart response from LLM
+                async for token in get_smart_response(item.message, context):
+                    full_text += token
+                    yield f"data: {token}\n\n"
+            except Exception as e:
+                print(f"Streaming error: {e}")
+
+            # 3. Reliability & Fallback
+            if not full_text:
+                # If LLM failed, yield base response text in chunks
+                for chunk in context.split(" "):
+                    yield f"data: {chunk} \n\n"
+
+            # 4. Final metadata for visual components
+            metadata = {
+                "visualType": base_response.get("visualType"),
+                "visualData": base_response.get("visualData"),
+                "chartData": base_response.get("chartData"),
+                "imageUrl": base_response.get("imageUrl"),
+                "showLegend": base_response.get("showLegend"),
+                "suggestions": base_response.get("suggestions")
+            }
+            yield f"data: {json.dumps(metadata)}\n\n"
+
+        return StreamingResponse(stream_generator(), media_type="text/event-stream")
+
+    else:
+        # Non-streaming path
+        full_text = ""
+        try:
+            async for token in get_smart_response(item.message, context):
+                full_text += token
+        except Exception as e:
+            print(f"LLM Error: {e}")
+
+        # Fallback to rule-based text if LLM fails or returns empty
+        if full_text.strip():
+            base_response["text"] = full_text
+
+        return base_response
+
 @app.get("/get-news")
 async def get_news():
     """Returns top 3 groundwater news headlines."""
