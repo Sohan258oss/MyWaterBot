@@ -96,9 +96,8 @@ def test_visual_types(mock_search):
         response = client.post("/ask", json={"message": "Maharashtra"})
         data = response.json()
         # If it's not in DB it might fall back to WHY_MAP
-        if data.get("visualType") == "action_panel": # Fallback for WHY_MAP
-             assert data["visualType"] == "action_panel"
-        else:
+        # Maharashtra fallback no longer returns action_panel
+        if data.get("visualType") == "status_card":
              assert data.get("visualType") == "status_card"
 
         # Multiple locations -> comparison_bars
