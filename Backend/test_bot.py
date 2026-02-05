@@ -2,25 +2,15 @@ import pytest
 from fastapi.testclient import TestClient
 import sys
 import os
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch
 
 # Add the current directory to sys.path to allow importing Backend.main
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from Backend.main import app, KNOWLEDGE_BASE, TIPS, WHY_MAP
 
-# Global mocks for Gemini
-patch('Backend.main.genai.configure').start()
-
-async def mock_get_smart_response(user_query, context):
-    """Mocks the async generator for Gemini responses."""
-    # Simply yield the context to satisfy existing tests that check for keywords in output
-    for ch in context:
-        yield ch
-
-@patch('Backend.main.get_smart_response', side_effect=mock_get_smart_response)
 @patch('Backend.main.semantic_search.search')
-def test_knowledge_base_query(mock_search, mock_smart):
+def test_knowledge_base_query(mock_search):
     mock_search.return_value = [{"name": "aquifer", "score": 0.9}]
     with TestClient(app) as client:
         # Semantic search for a knowledge base key
@@ -30,9 +20,8 @@ def test_knowledge_base_query(mock_search, mock_smart):
         assert "aquifer" in data["text"].lower()
         assert KNOWLEDGE_BASE["aquifer"] in data["text"]
 
-@patch('Backend.main.get_smart_response', side_effect=mock_get_smart_response)
 @patch('Backend.main.semantic_search.search')
-def test_location_query(mock_search, mock_smart):
+def test_location_query(mock_search):
     mock_search.return_value = [{"name": "Karnataka", "score": 0.9}]
     with TestClient(app) as client:
         # Semantic search for a location
@@ -42,9 +31,8 @@ def test_location_query(mock_search, mock_smart):
         assert "Karnataka" in data["text"]
         assert "extraction" in data["text"].lower()
 
-@patch('Backend.main.get_smart_response', side_effect=mock_get_smart_response)
 @patch('Backend.main.semantic_search.search')
-def test_news_fallback(mock_search, mock_smart):
+def test_news_fallback(mock_search):
     mock_search.return_value = []
     with TestClient(app) as client:
         # Query that should have low confidence (< 0.65)
@@ -53,9 +41,8 @@ def test_news_fallback(mock_search, mock_smart):
         data = response.json()
         assert "latest groundwater updates" in data["text"].lower()
 
-@patch('Backend.main.get_smart_response', side_effect=mock_get_smart_response)
 @patch('Backend.main.semantic_search.search')
-def test_why_query(mock_search, mock_smart):
+def test_why_query(mock_search):
     mock_search.return_value = [{"name": "punjab", "score": 0.9}]
     with TestClient(app) as client:
         # "Why" query matching WHY_MAP
@@ -65,9 +52,8 @@ def test_why_query(mock_search, mock_smart):
         assert "Punjab" in data["text"]
         assert WHY_MAP["punjab"] in data["text"]
 
-@patch('Backend.main.get_smart_response', side_effect=mock_get_smart_response)
 @patch('Backend.main.semantic_search.search')
-def test_master_plan_query(mock_search, mock_smart):
+def test_master_plan_query(mock_search):
     mock_search.return_value = [{"name": "master plan", "score": 0.9}]
     with TestClient(app) as client:
         # Query for one of the newly added 50 QA pairs
@@ -77,10 +63,9 @@ def test_master_plan_query(mock_search, mock_smart):
         assert "Master Plan" in data["text"]
         assert "1.42 crore" in data["text"]
 
-@patch('Backend.main.get_smart_response', side_effect=mock_get_smart_response)
 @patch('Backend.main.semantic_search.search')
 @patch('Backend.main.get_image_url')
-def test_map_suppression(mock_get_image, mock_search, mock_smart):
+def test_map_suppression(mock_get_image, mock_search):
     mock_search.return_value = [{"name": "Karnataka", "score": 0.9}]
     mock_get_image.return_value = "http://map.url"
     with TestClient(app) as client:
@@ -94,9 +79,8 @@ def test_map_suppression(mock_get_image, mock_search, mock_smart):
         data = response.json()
         assert data.get("imageUrl") == "http://map.url"
 
-@patch('Backend.main.get_smart_response', side_effect=mock_get_smart_response)
 @patch('Backend.main.semantic_search.search')
-def test_visual_types(mock_search, mock_smart):
+def test_visual_types(mock_search):
     with TestClient(app) as client:
         # Single location -> status_card (or risk_alert if contaminants exist)
         mock_search.return_value = [{"name": "Karnataka", "score": 0.9}]
@@ -126,9 +110,8 @@ def test_visual_types(mock_search, mock_smart):
         assert data.get("visualType") == "comparison_bars"
         assert len(data["visualData"]) >= 2
 
-@patch('Backend.main.get_smart_response', side_effect=mock_get_smart_response)
 @patch('Backend.main.semantic_search.search')
-def test_trend_query(mock_search, mock_smart):
+def test_trend_query(mock_search):
     mock_search.return_value = [{"name": "Punjab", "score": 0.9}]
     with TestClient(app) as client:
         # Query for trend
