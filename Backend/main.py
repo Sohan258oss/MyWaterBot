@@ -5,7 +5,9 @@ import json
 import math
 import sqlite3
 import re
-from huggingface_hub import InferenceClient, AsyncInferenceClient
+from huggingface_hub import InferenceClient
+from google import genai
+from google.genai import types
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from contextlib import asynccontextmanager
@@ -16,9 +18,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from duckduckgo_search import DDGS
 
 # -------------------- GLOBAL GENAI CLIENT --------------------
-GENAI_CLIENT = AsyncInferenceClient(
-    token=os.getenv("HF_TOKEN"),
-    timeout=60
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "MISSING_API_KEY"
+GEMINI_CLIENT = genai.Client(
+    api_key=GEMINI_API_KEY,
+    http_options=types.HttpOptions(api_version='v1')
 )
 
 
@@ -163,66 +166,54 @@ app = FastAPI(lifespan=lifespan)
 # -------------------- SMART GENAI LAYER --------------------
 async def get_smart_response(user_query: str, context: str):
     """
-    Generates a natural language explanation using Llama 3 via HF Inference API.
+    Generates a natural language explanation using Gemini 1.5 Flash via Google GenAI SDK.
     Only uses verified context provided by the rule-based/DB logic.
     """
-    client = GENAI_CLIENT
+    client = GEMINI_CLIENT
     context = context[:3500]
 
-    system_prompt = (
+    system_instruction = (
         "You are the 'Indian Groundwater Intelligence Bot'. Your goal is to translate technical "
         "CGWB (Central Ground Water Board) data into easy-to-understand, actionable advice.\n"
         "GUIDELINES:\n"
         "If extraction > 100%, use a concerned but professional tone.\n"
         "Use Indian terminology (e.g., 'Taluka', 'Lakh', 'Kharif/Rabi') where appropriate.\n"
         "If contaminants like Arsenic or Fluoride are mentioned, prioritize health warnings.\n"
-        "Keep responses under 200 words unless the user asks for a deep dive."
+        "Keep responses under 200 words unless the user asks for a deep dive.\n"
         "Never invent statistics or causes.\n"
         "Do not hallucinate or assume missing data."
     )
 
-    messages = [
-        {"role": "system", "content": system_prompt},
-    
-    # 1. THE NORTHERN/AGRICULTURAL PROTOTYPE (Punjab, Haryana, West UP)
-        {"role": "user", "content": "USER QUESTION: Why is Haryana water low?\nVERIFIED CONTEXT: Extraction 135%, Over-exploited. Major crops: Wheat and Paddy."},
-        {"role": "assistant", "content": "Haryana's groundwater is critically over-exploited (135%). In the breadbasket regions of North India, intensive irrigation for cereal crops pulls water faster than the monsoon recharges it. **Tip:** Shift to 'Direct Seeded Rice' (DSR) and increase crop diversification."},
+    contents = [
+        types.Content(role="user", parts=[types.Part.from_text("USER QUESTION: Why is Haryana water low?\nVERIFIED CONTEXT: Extraction 135%, Over-exploited. Major crops: Wheat and Paddy.")]),
+        types.Content(role="model", parts=[types.Part.from_text("Haryana's groundwater is critically over-exploited (135%). In the breadbasket regions of North India, intensive irrigation for cereal crops pulls water faster than the monsoon recharges it. **Tip:** Shift to 'Direct Seeded Rice' (DSR) and increase crop diversification.")]),
 
-    # 2. THE PENINSULAR/HARD-ROCK PROTOTYPE (Karnataka, Maharashtra, Telangana)
-        {"role": "user", "content": "USER QUESTION: What's the status in Bengaluru?\nVERIFIED CONTEXT: Extraction 98%, Stressed. Hard rock terrain, rapid urban growth."},
-        {"role": "assistant", "content": "Bengaluru is facing 'Stressed' conditions (98%). Unlike the North, South India's hard-rock terrain has limited 'sponginess' to hold water. Rapid urbanization covers recharge areas with concrete. **Tip:** Mandatory rooftop rainwater harvesting is the only way to revive these borewells."},
+        types.Content(role="user", parts=[types.Part.from_text("USER QUESTION: What's the status in Bengaluru?\nVERIFIED CONTEXT: Extraction 98%, Stressed. Hard rock terrain, rapid urban growth.")]),
+        types.Content(role="model", parts=[types.Part.from_text("Bengaluru is facing 'Stressed' conditions (98%). Unlike the North, South India's hard-rock terrain has limited 'sponginess' to hold water. Rapid urbanization covers recharge areas with concrete. **Tip:** Mandatory rooftop rainwater harvesting is the only way to revive these borewells.")]),
 
-    # 3. THE COASTAL/SALINITY PROTOTYPE (Gujarat, Tamil Nadu, Odisha)
-        {"role": "user", "content": "USER QUESTION: Is the water okay in coastal Gujarat?\nVERIFIED CONTEXT: Extraction 80%, Salinity ingress reported."},
-        {"role": "assistant", "content": "In coastal Gujarat, the 80% extraction rate is leading to 'Salinity Ingress.' As fresh groundwater levels drop, the sea seeps into the aquifers, making water salty. **Tip:** Stop over-pumping near the coast and build 'Tidal Regulators' to keep seawater out."},
+        types.Content(role="user", parts=[types.Part.from_text("USER QUESTION: Is the water okay in coastal Gujarat?\nVERIFIED CONTEXT: Extraction 80%, Salinity ingress reported.")]),
+        types.Content(role="model", parts=[types.Part.from_text("In coastal Gujarat, the 80% extraction rate is leading to 'Salinity Ingress.' As fresh groundwater levels drop, the sea seeps into the aquifers, making water salty. **Tip:** Stop over-pumping near the coast and build 'Tidal Regulators' to keep seawater out.")]),
 
-    # 4. THE MOUNTAIN/SPRING PROTOTYPE (Himachal, Uttarakhand, North East)
-        {"role": "user", "content": "USER QUESTION: Water status in Meghalaya?\nVERIFIED CONTEXT: Extraction 15%, Safe. High rainfall, spring-based systems."},
-        {"role": "assistant", "content": "Meghalaya is in the 'Safe' zone (15%). In the North East, water management is about 'Springsheds.' Even with high rain, water can run off quickly. **Tip:** Protect forest cover around community springs (Chasmas) to ensure year-round flow."},
+        types.Content(role="user", parts=[types.Part.from_text("USER QUESTION: Water status in Meghalaya?\nVERIFIED CONTEXT: Extraction 15%, Safe. High rainfall, spring-based systems.")]),
+        types.Content(role="model", parts=[types.Part.from_text("Meghalaya is in the 'Safe' zone (15%). In the North East, water management is about 'Springsheds.' Even with high rain, water can run off quickly. **Tip:** Protect forest cover around community springs (Chasmas) to ensure year-round flow.")]),
 
-    # THE REAL USER QUERY (This stays at the end)
-        {"role": "user", "content": f"USER QUESTION:\n{user_query}\n\nVERIFIED CONTEXT:\n{context}"}
+        types.Content(role="user", parts=[types.Part.from_text(f"USER QUESTION:\n{user_query}\n\nVERIFIED CONTEXT:\n{context}")])
     ]
 
+    config = types.GenerateContentConfig(
+        system_instruction=system_instruction,
+        max_output_tokens=300,
+        temperature=0.2
+    )
+
     try:
-        # chat_completion yields chunks incrementally if stream=True
-        # This aligns with the 'conversational' task required by some providers
-        stream = await client.chat_completion(
-            model="meta-llama/Meta-Llama-3-8B-Instruct",
-            messages=messages,
-            stream=True,
-            max_tokens=300
+        stream = await client.aio.models.generate_content_stream(
+            model="gemini-2.5-flash",
+            contents=contents,
+            config=config
         )
         async for chunk in stream:
-            # ---- SAFETY GUARDS (CRITICAL) ----
-            if not hasattr(chunk, "choices") or not chunk.choices:
-                continue
-
-            choice = chunk.choices[0]
-            if not hasattr(choice, "delta") or not choice.delta:
-                continue
-
-            token = getattr(choice.delta, "content", None)
+            token = chunk.text
             if not token:
                 continue
 
